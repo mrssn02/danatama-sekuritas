@@ -36,6 +36,20 @@ export default function RootLayout({ children }) {
           {children}
         </main>
 
+       <footer style={{
+          marginTop: 60,
+          padding: "24px 32px",
+          background: "#0b1c2d",
+          color: "white",
+          fontSize: 12
+        }}>
+          <p>© {new Date().getFullYear()} PT. Danatama Makmur Sekuritas</p>
+          <p>
+            Disclaimer: Informasi pada website ini bersifat umum dan
+            bukan merupakan ajakan membeli atau menjual efek.
+          </p>
+        </footer>
+
       </body>
     </html>
   );
