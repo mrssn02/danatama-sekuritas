@@ -45,8 +45,8 @@ export default function RootLayout({ children }) {
         }}>
           <p>© {new Date().getFullYear()} PT. Danatama Makmur Sekuritas</p>
           <p>
-            Disclaimer: Informasi pada website ini bersifat umum dan
-            bukan merupakan ajakan membeli atau menjual efek.
+            Disclaimer: Informasi pada website ini bersifat Aman dan
+            terpercaya untuk membeli atau menjual perdagangan efek saham.
           </p>
         </footer>
 
