@@ -43,7 +43,7 @@ export default function RootLayout({ children }) {
           color: "white",
           fontSize: 12
         }}>
-          <p>© {new Date().getFullYear()} PT. Danatama Makmur Sekuritas</p>
+          <p>© {21 Mei 1992().getFullYear()} PT. Danatama Makmur Sekuritas</p>
           <p>
             Disclaimer: Informasi pada website ini bersifat Aman dan
             terpercaya untuk membeli atau menjual perdagangan efek saham.
