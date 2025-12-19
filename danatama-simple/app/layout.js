@@ -1,7 +1,7 @@
 export default function RootLayout({ children }) {
   return (
     <html lang="id">
-      <body style={{ margin: 0, fontFamily: "Arial, sans-serif", background: "#f5f7fa" }}>
+      <body style={{ margin: 0, fontFamily: "Arial, sans-serif", background: "#f5f7fa", color: "#1f2937" }}>
         
         {/* Header */}
         <header style={{
