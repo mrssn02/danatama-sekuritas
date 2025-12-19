@@ -28,6 +28,8 @@ export default function RootLayout({ children }) {
             <a href="/" style={{ color: "white", textDecoration: "none" }}>Home</a>
             <a href="/tentang-kami" style={{ color: "white", textDecoration: "none" }}>Tentang Kami</a>
             <a href="/kontak" style={{ color: "white", textDecoration: "none" }}>Kontak</a>
+            <a href="/login" style={{ color: "white", textDecoration: "none" }}>Login</a>
+            <a href="/daftar" style={{ color: "white", textDecoration: "none" }}>Daftar</a>
           </nav>
         </header>
 
