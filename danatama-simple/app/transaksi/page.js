@@ -38,11 +38,11 @@ export default function Transaksi() {
           <p>Rp {Number(t.amount).toLocaleString("id-ID")}</p>
 
           {t.note && <pre style={box}>{t.note}</pre>}
-          {t.admin_note && (
-            <pre style={adminBox}>Admin: {t.admin_note}</pre>
-          )}
+          {t.admin_note && <pre style={adminBox}>Admin: {t.admin_note}</pre>}
 
-          <small>{new Date(t.created_at).toLocaleString("id-ID")}</small>
+          <small style={{ opacity: 0.65 }}>
+            {new Date(t.created_at).toLocaleString("id-ID")}
+          </small>
         </div>
       ))}
     </div>
@@ -61,13 +61,12 @@ const badge = (status) => ({
 });
 
 const card = {
-  background:"white",
-  padding:16,
-  borderRadius:12,
-  marginBottom:14,
-  boxShadow:"0 6px 16px rgba(0,0,0,0.06)"
+  background: "white",
+  padding: 16,
+  borderRadius: 12,
+  marginBottom: 14,
+  boxShadow: "0 6px 16px rgba(0,0,0,0.06)"
 };
-
-const row = { display:"flex", justifyContent:"space-between" };
-const box = { background:"#f8fafc", padding:10, borderRadius:8, fontSize:13 };
-const adminBox = { ...box, background:"#ecfeff", borderLeft:"4px solid #06b6d4" };
+const row = { display: "flex", justifyContent: "space-between", alignItems: "center" };
+const box = { background: "#f8fafc", padding: 10, borderRadius: 8, fontSize: 13, whiteSpace: "pre-wrap" };
+const adminBox = { ...box, background: "#ecfeff", borderLeft: "4px solid #06b6d4" };
