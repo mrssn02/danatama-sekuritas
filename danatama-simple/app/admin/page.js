@@ -9,7 +9,6 @@ const ADMIN_EMAIL = "sonandra111@gmail.com";
 export default function Admin() {
   const router = useRouter();
 
-  const [user, setUser] = useState(null);
   const [tx, setTx] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -17,32 +16,25 @@ export default function Admin() {
   const [depositBank, setDepositBank] = useState("");
   const [csWhatsapp, setCsWhatsapp] = useState("");
 
-  // manual adjustment
-  const [adjUserId, setAdjUserId] = useState("");
-  const [adjAmount, setAdjAmount] = useState("");
-  const [adjNote, setAdjNote] = useState("");
+  // manual balance
+  const [search, setSearch] = useState(""); // username / email
+  const [amount, setAmount] = useState("");
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) {
-        router.push("/login");
-        return;
-      }
+      if (!data.user) return router.push("/login");
 
       if (data.user.email !== ADMIN_EMAIL) {
         alert("Akses ditolak");
-        router.push("/");
-        return;
+        return router.push("/");
       }
 
-      setUser(data.user);
       await loadAll();
       setLoading(false);
     });
   }, []);
 
   const loadAll = async () => {
-    // transaksi pending
     const { data: trx } = await supabase
       .from("transactions")
       .select("*")
@@ -51,7 +43,6 @@ export default function Admin() {
 
     setTx(trx || []);
 
-    // settings
     const { data: s } = await supabase.from("settings").select("key,value");
     if (s) {
       setDepositBank(s.find(i => i.key === "deposit_bank")?.value || "");
@@ -59,7 +50,7 @@ export default function Admin() {
     }
   };
 
-  // === APPROVE / REJECT ===
+  // ================= APPROVE / REJECT =================
   const approve = async (t) => {
     await supabase.from("transactions")
       .update({ status: "approved" })
@@ -83,7 +74,7 @@ export default function Admin() {
     loadAll();
   };
 
-  // === UPDATE SETTINGS ===
+  // ================= SETTINGS =================
   const saveSetting = async (key, value) => {
     const { error } = await supabase
       .from("settings")
@@ -94,31 +85,51 @@ export default function Admin() {
     alert("Pengaturan disimpan");
   };
 
-  // === MANUAL ADJUSTMENT ===
+  // ================= MANUAL BALANCE (NO TRANSACTION LOG) =================
   const adjustManual = async () => {
-    const uid = adjUserId.trim();
-    const amt = Number(adjAmount);
+    if (!search || !amount) {
+      alert("Lengkapi pencarian user dan jumlah");
+      return;
+    }
 
-    if (!uid) return alert("User ID wajib diisi");
-    if (!amt || amt === 0) return alert("Amount tidak valid");
+    const amt = Number(amount);
+    if (!amt) {
+      alert("Jumlah tidak valid");
+      return;
+    }
 
-    // catat transaksi
-    await supabase.from("transactions").insert({
-      user_id: uid,
-      type: "adjustment",
-      amount: Math.abs(amt),
-      status: "approved",
-      note: adjNote || `Adjustment manual ${amt}`
+    let userId = null;
+
+    // 1️⃣ cari berdasarkan username
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", search)
+      .single();
+
+    if (profile?.id) {
+      userId = profile.id;
+    } else {
+      // 2️⃣ cari berdasarkan email
+      const { data: users } = await supabase.auth.admin.listUsers();
+      const found = users.users.find(u => u.email === search);
+      if (found) userId = found.id;
+    }
+
+    if (!userId) {
+      alert("User tidak ditemukan");
+      return;
+    }
+
+    // === LANGSUNG ADJUST SALDO (TANPA RIWAYAT) ===
+    await supabase.rpc("adjust_balance", {
+      uid: userId,
+      amt
     });
 
-    // ubah saldo
-    await supabase.rpc("adjust_balance", { uid, amt });
-
-    alert("Saldo berhasil disesuaikan");
-    setAdjUserId("");
-    setAdjAmount("");
-    setAdjNote("");
-    loadAll();
+    alert("Saldo berhasil diperbarui");
+    setSearch("");
+    setAmount("");
   };
 
   if (loading) return <p>Loading admin panel...</p>;
@@ -157,7 +168,7 @@ export default function Admin() {
 
       {/* ================= TRANSAKSI ================= */}
       <div style={{ marginTop: 30 }}>
-        <h3>Transaksi Pending</h3>
+        <h3>Deposit & Withdraw Pending</h3>
 
         {tx.length === 0 && <p>Tidak ada transaksi pending</p>}
 
@@ -166,9 +177,11 @@ export default function Admin() {
             <p>
               <b>{t.type.toUpperCase()}</b> — Rp {Number(t.amount).toLocaleString("id-ID")}
             </p>
-            <p style={{ fontSize: 12, opacity: 0.7 }}>
-              User ID: {t.user_id}
-            </p>
+
+            {/* === INFO REKENING WD === */}
+            {t.type === "withdraw" && t.note && (
+              <pre style={noteBox}>{t.note}</pre>
+            )}
 
             <div style={{ display: "flex", gap: 10 }}>
               <button style={btn} onClick={() => approve(t)}>ACC</button>
@@ -178,31 +191,25 @@ export default function Admin() {
         ))}
       </div>
 
-      {/* ================= ADJUSTMENT ================= */}
+      {/* ================= MANUAL BALANCE ================= */}
       <div style={{ marginTop: 30 }}>
-        <h3>Tambah / Kurangi Saldo (Manual)</h3>
+        <h3>Tambah / Kurangi Saldo Manual</h3>
 
         <div style={card}>
           <input
             style={input}
-            placeholder="User ID (UUID)"
-            value={adjUserId}
-            onChange={(e) => setAdjUserId(e.target.value)}
+            placeholder="Username atau Email"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
           <input
             style={input}
-            placeholder="Amount (contoh: 50000 atau -50000)"
-            value={adjAmount}
-            onChange={(e) => setAdjAmount(e.target.value)}
-          />
-          <input
-            style={input}
-            placeholder="Catatan (opsional)"
-            value={adjNote}
-            onChange={(e) => setAdjNote(e.target.value)}
+            placeholder="Jumlah (contoh: 50000 atau -50000)"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
           />
           <button style={btn} onClick={adjustManual}>
-            Simpan Adjustment
+            Simpan Saldo
           </button>
         </div>
       </div>
@@ -250,4 +257,13 @@ const btnDanger = {
   padding: "8px 14px",
   borderRadius: 8,
   cursor: "pointer"
+};
+
+const noteBox = {
+  background: "#f8fafc",
+  padding: 10,
+  borderRadius: 8,
+  fontSize: 13,
+  whiteSpace: "pre-wrap",
+  marginBottom: 10
 };
