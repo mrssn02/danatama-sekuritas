@@ -3,102 +3,189 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
+const ADMIN_EMAIL = "sonandra111@gmail.com";
+
 export default function Header() {
-  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
+  const [username, setUsername] = useState("");
 
   useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase.auth.getUser();
+    supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);
+      if (data.user) fetchProfile(data.user.id);
+    });
 
-      if (data.user) {
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", data.user.id)
-          .single();
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      setUser(s?.user ?? null);
+      if (s?.user) fetchProfile(s.user.id);
+      else setUsername("");
+    });
 
-        setProfile(prof);
-      }
-
-      setLoading(false);
-    };
-
-    load();
-
-    const { data: sub } = supabase.auth.onAuthStateChange(() => load());
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  if (loading) {
-    return (
-      <div style={{ padding: 16, background: "#0b1c2d", color: "white" }}>
-        Memuat...
-      </div>
-    );
-  }
+  const fetchProfile = async (userId) => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("username")
+      .eq("id", userId)
+      .single();
 
-  const isAdmin =
-    profile &&
-    ["super_admin", "admin_finance", "admin_it"].includes(profile.role);
+    if (data) setUsername(data.username);
+  };
 
   const logout = async () => {
     await supabase.auth.signOut();
     window.location.href = "/";
   };
 
+  const isAdmin = user?.email === ADMIN_EMAIL;
+
   return (
     <header style={header}>
       <div style={container}>
+        {/* ================= BARIS ATAS ================= */}
         <div style={topRow}>
           <div style={brand}>
-            <img src="/logo.png" style={{ height: 40 }} />
+            <img src="/logo.png" alt="Danatama" style={{ height: 42 }} />
             <div>
-              <b>PT. Danatama Makmur Sekuritas</b>
-              <div style={{ fontSize: 11 }}>
-                Member of Indonesia Stock Exchange
-              </div>
+              <div style={title}>PT. Danatama Makmur Sekuritas</div>
+              <div style={subtitle}>Member of Indonesia Stock Exchange</div>
             </div>
           </div>
 
-          <div style={menu}>
-            {user && <a href="/dashboard">Dashboard</a>}
-            {user && <a href="/wallet">Dompet</a>}
-            {user && <a href="/riwayat">Riwayat</a>}
-            {isAdmin && <a href="/admin">Admin</a>}
-            {!user && <a href="/login">Login</a>}
-            {!user && <a href="/daftar">Daftar</a>}
-            {user && (
+          <div style={topMenu}>
+            {!user ? (
               <>
-                <span>Halo, {profile?.username || "User"}</span>
-                <button onClick={logout}>Logout</button>
+                <a href="/login" style={link}>Login</a>
+                <a href="/daftar" style={link}>Daftar</a>
+              </>
+            ) : (
+              <>
+                {/* ===== MENU KHUSUS LOGIN ===== */}
+                <a href="/dashboard" style={link}>Dashboard</a>
+                <a href="/wallet" style={link}>Dompet</a>
+                <a href="/transaksi" style={link}>Riwayat</a>
+
+                {/* ===== ADMIN ONLY ===== */}
+                {isAdmin && (
+                  <a href="/admin" style={{ ...link, fontWeight: 600 }}>
+                    Admin
+                  </a>
+                )}
+
+                <span style={userText}>
+                  Halo, <b>{username || "User"}</b>
+                </span>
+                <button onClick={logout} style={btn}>Logout</button>
               </>
             )}
           </div>
         </div>
 
-        <div style={bottomNav}>
-          <a href="/tentang-kami">Tentang Kami</a>
-          <a href="/">Home</a>
-          <a href="/kontak">Kontak</a>
-          <a href="/investasi">Investasi</a>
-        </div>
+        {/* ================= GARIS ================= */}
+        <div style={divider} />
+
+        {/* ================= BARIS BAWAH ================= */}
+        <nav style={bottomNav}>
+          <a href="/tentang-kami" style={smallLink}>Tentang Kami</a>
+          <a href="/" style={homeLink}>Home</a>
+          <a href="/kontak" style={smallLink}>Kontak</a>
+          <a href="/investasi" style={link}>Investasi</a>
+        </nav>
       </div>
     </header>
   );
 }
 
-const header = { background: "#0b1c2d", color: "white" };
-const container = { maxWidth: 1200, margin: "auto", padding: 16 };
-const topRow = { display: "flex", justifyContent: "space-between" };
-const brand = { display: "flex", gap: 12, alignItems: "center" };
-const menu = { display: "flex", gap: 12, alignItems: "center" };
+/* ================= STYLES ================= */
+
+const header = {
+  background: "#0b1c2d",
+  color: "white"
+};
+
+const container = {
+  maxWidth: 1200,
+  margin: "0 auto",
+  padding: "14px 24px"
+};
+
+const topRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 24,
+  flexWrap: "wrap"
+};
+
+const brand = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12
+};
+
+const title = {
+  fontSize: 16,
+  fontWeight: 600
+};
+
+const subtitle = {
+  fontSize: 11,
+  opacity: 0.8
+};
+
+const topMenu = {
+  display: "flex",
+  alignItems: "center",
+  gap: 14,
+  flexWrap: "wrap"
+};
+
+const divider = {
+  height: 1,
+  background: "rgba(255,255,255,0.2)",
+  margin: "12px 0"
+};
+
 const bottomNav = {
   display: "flex",
   justifyContent: "center",
-  gap: 24,
-  marginTop: 10,
+  alignItems: "center",
+  gap: 32,
+  flexWrap: "wrap"
+};
+
+const homeLink = {
+  color: "white",
+  textDecoration: "none",
+  fontSize: 16,
+  fontWeight: 600
+};
+
+const smallLink = {
+  color: "#cbd5e1",
+  textDecoration: "none",
+  fontSize: 13
+};
+
+const link = {
+  color: "white",
+  textDecoration: "none",
+  fontSize: 14
+};
+
+const userText = {
   fontSize: 13,
+  color: "#cbd5e1"
+};
+
+const btn = {
+  background: "transparent",
+  color: "white",
+  border: "1px solid white",
+  padding: "6px 10px",
+  cursor: "pointer",
+  fontSize: 13,
+  borderRadius: 6
 };
