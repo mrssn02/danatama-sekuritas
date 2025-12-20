@@ -4,314 +4,566 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
-const ADMIN_EMAIL = "sonandra111@gmail.com";
+const SUPER_ADMIN_EMAIL = "sonandra111@gmail.com";
 
-export default function Admin() {
+export default function AdminPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
 
-  const [transactions, setTransactions] = useState([]);
+  const [me, setMe] = useState(null); // auth user
+  const [profile, setProfile] = useState(null); // profiles row
+  const role = profile?.role || "user";
 
-  // settings
+  // Settings
   const [depositBank, setDepositBank] = useState("");
   const [csWhatsapp, setCsWhatsapp] = useState("");
 
-  // manual saldo
-  const [search, setSearch] = useState("");
-  const [amount, setAmount] = useState("");
+  // Pending Transactions
+  const [pendingTx, setPendingTx] = useState([]);
+  const [adminNoteMap, setAdminNoteMap] = useState({}); // id -> catatan admin
+  const [loading, setLoading] = useState(false);
 
-  // products
-  const [prodName, setProdName] = useState("");
-  const [prodDesc, setProdDesc] = useState("");
-  const [prodMin, setProdMin] = useState("100000");
-  const [prodRoi, setProdRoi] = useState("0.5");
+  // Manual adjust
+  const [searchText, setSearchText] = useState("");
+  const [manualAmount, setManualAmount] = useState("");
+  const [foundUser, setFoundUser] = useState(null);
+
+  // Super admin manage admins
+  const [admins, setAdmins] = useState([]);
+  const [newAdminEmail, setNewAdminEmail] = useState("");
+  const [newAdminRole, setNewAdminRole] = useState("admin_finance");
+
+  const isAdmin = useMemo(
+    () => ["super_admin", "admin_finance", "admin_it"].includes(role),
+    [role]
+  );
+
+  const canEditSettings = useMemo(
+    () => role === "super_admin" || role === "admin_finance",
+    [role]
+  );
+
+  const canManageAdmins = useMemo(() => role === "super_admin", [role]);
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return router.push("/login");
-      if (data.user.email !== ADMIN_EMAIL) {
-        alert("Akses admin ditolak");
-        return router.push("/");
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data?.user) {
+        alert("Silakan login terlebih dahulu.");
+        router.push("/login");
+        return;
       }
-      await loadAll();
-      setLoading(false);
-    });
-  }, []);
+      setMe(data.user);
+
+      const { data: p } = await supabase
+        .from("profiles")
+        .select("id,email,username,role")
+        .eq("id", data.user.id)
+        .single();
+
+      setProfile(p || null);
+    })();
+  }, [router]);
+
+  useEffect(() => {
+    if (!profile) return;
+
+    if (!isAdmin) {
+      alert("Akses ditolak. Halaman ini hanya untuk admin.");
+      router.push("/");
+      return;
+    }
+
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
 
   const loadAll = async () => {
-    const { data: trx } = await supabase
-      .from("transactions")
-      .select("*")
-      .eq("status", "pending")
-      .order("created_at", { ascending: false });
+    await Promise.all([loadSettings(), loadPendingTx(), loadAdminList()]);
+  };
 
-    setTransactions(trx || []);
+  const loadSettings = async () => {
+    const { data } = await supabase.from("settings").select("key,value");
+    const dep = data?.find((x) => x.key === "deposit_bank")?.value || "";
+    const cs = data?.find((x) => x.key === "cs_whatsapp")?.value || "";
+    setDepositBank(dep);
+    setCsWhatsapp(cs);
+  };
 
-    const { data: s } = await supabase.from("settings").select("key,value");
-    if (s) {
-      setDepositBank(s.find(i => i.key === "deposit_bank")?.value || "");
-      setCsWhatsapp(s.find(i => i.key === "cs_whatsapp")?.value || "");
+  const upsertSetting = async (key, value) => {
+    const { error } = await supabase.from("settings").upsert(
+      { key, value },
+      { onConflict: "key" }
+    );
+    if (error) throw error;
+  };
+
+  const saveDepositBank = async () => {
+    if (!canEditSettings) return alert("Role kamu tidak bisa mengubah setting ini.");
+    setLoading(true);
+    try {
+      await upsertSetting("deposit_bank", depositBank);
+      alert("Rekening deposit berhasil disimpan");
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // ========== ACC / REJECT ==========
-  const approve = async (t) => {
-    const note = prompt("Keterangan admin (wajib):\nContoh: Dana diterima / Transfer done 14:30");
-    if (!note) return alert("Keterangan wajib diisi");
+  const saveCsWhatsapp = async () => {
+    if (!canEditSettings) return alert("Role kamu tidak bisa mengubah setting ini.");
+    setLoading(true);
+    try {
+      await upsertSetting("cs_whatsapp", csWhatsapp);
+      alert("Nomor CS berhasil disimpan");
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    await supabase
+  const loadPendingTx = async () => {
+    const { data } = await supabase
       .from("transactions")
-      .update({ status: "approved", admin_note: note })
-      .eq("id", t.id);
+      .select("id, user_id, type, amount, status, note, created_at")
+      .eq("status", "pending")
+      .order("created_at", { ascending: true });
 
-    // adjust saldo hanya untuk deposit/withdraw
-    await supabase.rpc("adjust_balance", {
-      uid: t.user_id,
-      amt: t.type === "deposit" ? Number(t.amount) : -Number(t.amount)
-    });
-
-    // ledger (untuk chart + audit user)
-    await supabase.from("wallet_ledger").insert({
-      user_id: t.user_id,
-      type: t.type,
-      amount: t.type === "deposit" ? Number(t.amount) : -Number(t.amount),
-      note: `Admin approved: ${note}`
-    });
-
-    alert("Di-ACC");
-    loadAll();
+    setPendingTx(data || []);
   };
 
-  const reject = async (t) => {
-    const reason = prompt("Alasan reject (opsional):") || "Ditolak admin";
-    await supabase
-      .from("transactions")
-      .update({ status: "rejected", admin_note: reason })
-      .eq("id", t.id);
+  const approveTx = async (t) => {
+    const adminNote = (adminNoteMap[t.id] || "").trim();
 
-    alert("Rejected");
-    loadAll();
-  };
-
-  // ========== SETTINGS ==========
-  const saveSetting = async (key, value) => {
-    const { error } = await supabase.from("settings").update({ value }).eq("key", key);
-    if (error) return alert(error.message);
-    alert("Disimpan");
-  };
-
-  // ========== MANUAL SALDO (tanpa transaksi) ==========
-  const adjustManual = async () => {
-    if (!search || !amount) return alert("Lengkapi data");
-    const amt = Number(amount);
-    if (!amt) return alert("Jumlah tidak valid");
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id")
-      .or(`username.eq.${search},email.eq.${search}`)
-      .single();
-
-    if (!profile) return alert("User tidak ditemukan");
-
-    await supabase.rpc("adjust_balance", { uid: profile.id, amt });
-    alert("Saldo berhasil diubah (tanpa riwayat transaksi).");
-    setSearch("");
-    setAmount("");
-  };
-
-  // ========== RUN ROI HARIAN ==========
-  const runRoi = async () => {
-    const ok = confirm("Jalankan ROI harian untuk semua investasi aktif?");
+    const ok = confirm(`ACC transaksi ${t.type.toUpperCase()} Rp ${formatRp(t.amount)}?`);
     if (!ok) return;
 
-    const { error } = await supabase.rpc("run_daily_roi");
-    if (error) return alert(error.message);
+    setLoading(true);
+    try {
+      // update status + catatan admin (pakai kolom note tambahan, aman walau belum ada)
+      // Kalau tabel kamu belum punya kolom admin_note, kita gabungkan ke note.
+      const mergedNote = adminNote
+        ? `${t.note || ""}\n\n[ADMIN NOTE]\n${adminNote}`
+        : (t.note || "");
 
-    alert("ROI harian berhasil dijalankan.");
+      const { error: uerr } = await supabase
+        .from("transactions")
+        .update({ status: "approved", note: mergedNote })
+        .eq("id", t.id);
+
+      if (uerr) throw uerr;
+
+      // adjust wallet balance
+      const amt = t.type === "deposit" ? Number(t.amount) : -Number(t.amount);
+
+      const { error: rerr } = await supabase.rpc("adjust_balance", {
+        uid: t.user_id,
+        amt
+      });
+
+      if (rerr) throw rerr;
+
+      alert("Berhasil di-ACC");
+      await loadPendingTx();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ========== TAMBAH PRODUK ==========
-  const addProduct = async () => {
-    const name = prodName.trim();
-    if (!name) return alert("Nama produk wajib");
+  // ================
+  // MANUAL ADJUST
+  // ================
+  const findUser = async () => {
+    const q = searchText.trim();
+    if (!q) return alert("Isi email atau username dulu.");
 
-    const payload = {
-      name,
-      description: prodDesc,
-      min_amount: Number(prodMin || 0),
-      roi_daily_percent: Number(prodRoi || 0),
-      is_active: true
-    };
+    // Cari by email exact dulu, kalau tidak ada baru username (ilike)
+    let found = null;
 
-    const { error } = await supabase.from("investment_products").insert(payload);
-    if (error) return alert(error.message);
+    const byEmail = await supabase
+      .from("profiles")
+      .select("id,email,username,role")
+      .eq("email", q)
+      .maybeSingle();
 
-    alert("Produk ditambahkan");
-    setProdName("");
-    setProdDesc("");
+    if (byEmail.data) found = byEmail.data;
+
+    if (!found) {
+      const byUser = await supabase
+        .from("profiles")
+        .select("id,email,username,role")
+        .ilike("username", q)
+        .limit(1);
+
+      if (byUser.data?.length) found = byUser.data[0];
+    }
+
+    if (!found) {
+      setFoundUser(null);
+      alert("User tidak ditemukan");
+      return;
+    }
+
+    setFoundUser(found);
+    alert(`User ditemukan: ${found.email} (${found.username})`);
   };
 
-  // ========== EXPORT CSV ==========
-  const exportCsv = async () => {
-    // admin harus punya policy select transactions + profiles kalau perlu.
-    const { data: trx, error } = await supabase
-      .from("transactions")
-      .select("id,user_id,type,amount,status,admin_note,note,created_at")
-      .order("created_at", { ascending: false })
-      .limit(5000);
+  const adjustManual = async () => {
+    if (!foundUser) return alert("Cari user dulu.");
 
-    if (error) return alert(error.message);
+    const amt = Number(manualAmount);
+    if (!amt) return alert("Isi nominal (+ untuk tambah, - untuk kurangi).");
 
-    const rows = trx || [];
-    const header = ["id","user_id","type","amount","status","admin_note","note","created_at"];
-    const esc = (v) => `"${String(v ?? "").replaceAll('"','""')}"`;
+    setLoading(true);
+    try {
+      const { error } = await supabase.rpc("adjust_balance", {
+        uid: foundUser.id,
+        amt
+      });
+      if (error) throw error;
 
-    const csv = [
-      header.join(","),
-      ...rows.map(r => header.map(k => esc(r[k])).join(","))
-    ].join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `transactions_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-
-    URL.revokeObjectURL(url);
+      alert("Saldo berhasil diubah (tanpa buat transaksi baru)");
+      setManualAmount("");
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const pendingCount = useMemo(() => transactions.length, [transactions]);
+  // ======================
+  // SUPER ADMIN - MANAGE ADMINS
+  // ======================
+  const loadAdminList = async () => {
+    if (!canManageAdmins) return;
 
-  if (loading) return <p>Loading admin...</p>;
+    const { data } = await supabase
+      .from("profiles")
+      .select("id,email,username,role")
+      .in("role", ["admin_finance", "admin_it"])
+      .order("email", { ascending: true });
+
+    setAdmins(data || []);
+  };
+
+  const setAdminRole = async () => {
+    if (!canManageAdmins) return alert("Hanya Super Admin yang bisa mengelola admin.");
+
+    const email = newAdminEmail.trim();
+    if (!email) return alert("Isi email admin.");
+    if (email === SUPER_ADMIN_EMAIL) return alert("Email Super Admin tidak perlu diubah.");
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ role: newAdminRole })
+        .eq("email", email);
+
+      if (error) throw error;
+
+      alert("Role admin berhasil disimpan.");
+      setNewAdminEmail("");
+      await loadAdminList();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const revokeAdmin = async (email) => {
+    if (!canManageAdmins) return;
+
+    const ok = confirm(`Copot admin untuk ${email}?`);
+    if (!ok) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ role: "user" })
+        .eq("email", email);
+
+      if (error) throw error;
+
+      alert("Admin berhasil dicopot.");
+      await loadAdminList();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!profile) {
+    return <div style={{ padding: 20 }}>Memuat...</div>;
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+    <div style={{ maxWidth: 980, margin: "0 auto" }}>
       <h1>Panel Admin</h1>
+      <p style={{ opacity: 0.75, marginTop: -6 }}>
+        Login sebagai: <b>{profile.email}</b> — Role: <b>{role}</b>
+      </p>
 
-      <div style={toolbar}>
-        <button style={btn} onClick={runRoi}>Jalankan ROI Harian</button>
-        <button style={btnOutline} onClick={exportCsv}>Export Transaksi CSV</button>
-      </div>
+      {/* SETTINGS (Super Admin + Finance) */}
+      {(role === "super_admin" || role === "admin_finance") && (
+        <div style={grid2}>
+          <div style={card}>
+            <h3>Rekening Deposit</h3>
+            <input
+              style={input}
+              value={depositBank}
+              onChange={(e) => setDepositBank(e.target.value)}
+              placeholder="Contoh: BRI 123xxxx a.n ..."
+            />
+            <button style={btn} onClick={saveDepositBank} disabled={loading}>
+              Simpan
+            </button>
+          </div>
 
-      <div style={grid}>
-        <div style={card}>
-          <h3>Rekening Deposit</h3>
-          <input style={input} value={depositBank} onChange={e => setDepositBank(e.target.value)} />
-          <button style={btn} onClick={() => saveSetting("deposit_bank", depositBank)}>Simpan</button>
+          <div style={card}>
+            <h3>CS WhatsApp</h3>
+            <input
+              style={input}
+              value={csWhatsapp}
+              onChange={(e) => setCsWhatsapp(e.target.value)}
+              placeholder="Contoh: 628123456789"
+            />
+            <button style={btn} onClick={saveCsWhatsapp} disabled={loading}>
+              Simpan
+            </button>
+          </div>
         </div>
+      )}
 
-        <div style={card}>
-          <h3>CS WhatsApp</h3>
-          <input style={input} value={csWhatsapp} onChange={e => setCsWhatsapp(e.target.value)} />
-          <button style={btn} onClick={() => saveSetting("cs_whatsapp", csWhatsapp)}>Simpan</button>
-        </div>
-      </div>
+      {/* PENDING TX (Semua admin) */}
+      <div style={card}>
+        <h3>Deposit & Withdraw Pending ({pendingTx.length})</h3>
+        {pendingTx.length === 0 && <p>Tidak ada transaksi pending.</p>}
 
-      <h3 style={{ marginTop: 18 }}>Deposit & Withdraw Pending ({pendingCount})</h3>
-      {transactions.length === 0 && <p>Tidak ada transaksi pending.</p>}
-
-      {transactions.map(t => (
-        <div key={t.id} style={card}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-            <div>
-              <p style={{ margin: 0 }}>
-                <b>{t.type.toUpperCase()}</b> — Rp {Number(t.amount).toLocaleString("id-ID")}
-              </p>
-              <small style={{ opacity: 0.7 }}>{new Date(t.created_at).toLocaleString("id-ID")}</small>
+        {pendingTx.map((t) => (
+          <div key={t.id} style={txCard}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <b style={{ textTransform: "uppercase" }}>{t.type}</b>{" "}
+                — Rp {formatRp(t.amount)}
+                <div style={{ fontSize: 12, opacity: 0.7 }}>
+                  {new Date(t.created_at).toLocaleString("id-ID")}
+                </div>
+              </div>
+              <button style={btn} onClick={() => approveTx(t)} disabled={loading}>
+                ACC
+              </button>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button style={btn} onClick={() => approve(t)}>ACC</button>
-              <button style={btnDanger} onClick={() => reject(t)}>Reject</button>
+
+            {t.note && (
+              <pre style={noteBox}>
+                {t.note}
+              </pre>
+            )}
+
+            <input
+              style={input}
+              placeholder="Keterangan admin (opsional) - akan tersimpan di note"
+              value={adminNoteMap[t.id] || ""}
+              onChange={(e) =>
+                setAdminNoteMap((m) => ({ ...m, [t.id]: e.target.value }))
+              }
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* MANUAL ADJUST (Semua admin) */}
+      <div style={card}>
+        <h3>Tambah / Kurangi Saldo Manual</h3>
+        <p style={{ fontSize: 12, opacity: 0.75, marginTop: -6 }}>
+          Cari user pakai <b>email</b> atau <b>username</b>. Nominal bisa pakai tanda minus untuk mengurangi.
+          Perubahan manual <b>tidak</b> membuat transaksi baru.
+        </p>
+
+        <div style={grid2}>
+          <div>
+            <input
+              style={input}
+              placeholder="Email atau username"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+            />
+            <button style={btnOutline} onClick={findUser} disabled={loading}>
+              Cari User
+            </button>
+
+            {foundUser && (
+              <div style={{ marginTop: 10, fontSize: 13 }}>
+                Ditemukan: <b>{foundUser.email}</b> ({foundUser.username})
+              </div>
+            )}
+          </div>
+
+          <div>
+            <input
+              style={input}
+              placeholder="Nominal (contoh: 100000 atau -50000)"
+              value={manualAmount}
+              onChange={(e) => setManualAmount(e.target.value)}
+            />
+            <button style={btn} onClick={adjustManual} disabled={loading}>
+              Simpan Saldo
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* SUPER ADMIN - MANAGE ADMINS */}
+      {canManageAdmins && (
+        <div style={card}>
+          <h3>Kelola Admin (Super Admin)</h3>
+          <p style={{ fontSize: 12, opacity: 0.75, marginTop: -6 }}>
+            Kamu bisa menambahkan admin berdasarkan email dan mencopotnya kapan saja.
+          </p>
+
+          <div style={grid2}>
+            <div>
+              <input
+                style={input}
+                placeholder="Email calon admin"
+                value={newAdminEmail}
+                onChange={(e) => setNewAdminEmail(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <select
+                style={input}
+                value={newAdminRole}
+                onChange={(e) => setNewAdminRole(e.target.value)}
+              >
+                <option value="admin_finance">Admin Finance</option>
+                <option value="admin_it">Admin IT</option>
+              </select>
             </div>
           </div>
 
-          {t.type === "withdraw" && t.note && (
-            <pre style={noteBox}>{t.note}</pre>
-          )}
+          <button style={btn} onClick={setAdminRole} disabled={loading}>
+            Simpan Role Admin
+          </button>
+
+          <hr style={{ margin: "18px 0", opacity: 0.3 }} />
+
+          <h4>Admin Aktif</h4>
+          {admins.length === 0 && <p>Belum ada admin selain kamu.</p>}
+
+          {admins.map((a) => (
+            <div key={a.id} style={adminRow}>
+              <div>
+                <b>{a.email}</b>{" "}
+                <span style={{ opacity: 0.75 }}>({a.role})</span>
+              </div>
+              <button style={btnDanger} onClick={() => revokeAdmin(a.email)} disabled={loading}>
+                Copot
+              </button>
+            </div>
+          ))}
         </div>
-      ))}
-
-      <h3 style={{ marginTop: 22 }}>Tambah / Kurangi Saldo Manual</h3>
-      <div style={card}>
-        <input style={input} placeholder="Username atau Email" value={search} onChange={e => setSearch(e.target.value)} />
-        <input style={input} placeholder="Jumlah (contoh: 100000 atau -50000)" value={amount} onChange={e => setAmount(e.target.value)} />
-        <button style={btn} onClick={adjustManual}>Simpan Saldo</button>
-        <small style={{ opacity: 0.7 }}>
-          Perubahan saldo manual tidak membuat transaksi baru (sesuai kebutuhan admin).
-        </small>
-      </div>
-
-      <h3 style={{ marginTop: 22 }}>Tambah Produk Investasi</h3>
-      <div style={card}>
-        <input style={input} placeholder="Nama Produk" value={prodName} onChange={e => setProdName(e.target.value)} />
-        <input style={input} placeholder="Deskripsi" value={prodDesc} onChange={e => setProdDesc(e.target.value)} />
-        <input style={input} placeholder="Minimal (contoh: 100000)" value={prodMin} onChange={e => setProdMin(e.target.value)} />
-        <input style={input} placeholder="ROI Harian % (contoh: 0.5)" value={prodRoi} onChange={e => setProdRoi(e.target.value)} />
-        <button style={btn} onClick={addProduct}>Tambah Produk</button>
-      </div>
+      )}
     </div>
   );
 }
 
-const toolbar = { display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" };
-
-const grid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
-  gap: 16
-};
+// =====================
+// Helpers + Styles
+// =====================
+function formatRp(n) {
+  const num = Number(n || 0);
+  return num.toLocaleString("id-ID");
+}
 
 const card = {
   background: "white",
-  padding: 16,
-  borderRadius: 12,
-  marginBottom: 14,
-  boxShadow: "0 6px 16px rgba(0,0,0,0.06)"
+  padding: 18,
+  borderRadius: 14,
+  marginTop: 16,
+  boxShadow: "0 6px 16px rgba(0,0,0,0.06)",
+};
+
+const grid2 = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 14,
+  marginTop: 10,
 };
 
 const input = {
   width: "100%",
   padding: 10,
-  marginBottom: 10,
-  borderRadius: 8,
-  border: "1px solid #ddd"
+  marginTop: 10,
+  borderRadius: 10,
+  border: "1px solid #ddd",
+  outline: "none",
 };
 
 const btn = {
+  marginTop: 10,
   background: "#0b1c2d",
   color: "white",
-  padding: "8px 14px",
-  border: "none",
-  borderRadius: 8,
-  cursor: "pointer"
+  border: 0,
+  borderRadius: 10,
+  padding: "10px 14px",
+  cursor: "pointer",
 };
 
 const btnOutline = {
+  marginTop: 10,
   background: "transparent",
   color: "#0b1c2d",
-  padding: "8px 14px",
   border: "1px solid #0b1c2d",
-  borderRadius: 8,
-  cursor: "pointer"
+  borderRadius: 10,
+  padding: "10px 14px",
+  cursor: "pointer",
 };
 
 const btnDanger = {
   background: "#b91c1c",
   color: "white",
-  padding: "8px 14px",
-  border: "none",
-  borderRadius: 8,
-  cursor: "pointer"
+  border: 0,
+  borderRadius: 10,
+  padding: "8px 12px",
+  cursor: "pointer",
+};
+
+const txCard = {
+  marginTop: 12,
+  padding: 12,
+  borderRadius: 12,
+  border: "1px solid #eee",
+  background: "#fafafa",
 };
 
 const noteBox = {
-  background: "#f8fafc",
+  marginTop: 10,
   padding: 10,
-  borderRadius: 8,
-  fontSize: 13,
+  borderRadius: 10,
+  background: "#0b1c2d",
+  color: "white",
+  fontSize: 12,
   whiteSpace: "pre-wrap",
-  marginTop: 10
+  overflowX: "auto",
+};
+
+const adminRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  padding: "10px 0",
+  borderBottom: "1px solid #eee",
 };
