@@ -65,6 +65,7 @@ export default function Header() {
                 {/* ===== MENU KHUSUS LOGIN ===== */}
                 <a href="/dashboard" style={link}>Dashboard</a>
                 <a href="/wallet" style={link}>Dompet</a>
+                <a href="/transaksi" style={link}>Riwayat</a>
 
                 {/* ===== ADMIN ONLY ===== */}
                 {isAdmin && (
@@ -90,6 +91,7 @@ export default function Header() {
           <a href="/tentang-kami" style={smallLink}>Tentang Kami</a>
           <a href="/" style={homeLink}>Home</a>
           <a href="/kontak" style={smallLink}>Kontak</a>
+          <a href="/investasi" style={link}>Investasi</a>
         </nav>
       </div>
     </header>
