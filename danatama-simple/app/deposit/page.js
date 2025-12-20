@@ -6,22 +6,29 @@ import { supabase } from "../../lib/supabase";
 
 export default function Deposit() {
   const router = useRouter();
+
   const [amount, setAmount] = useState("");
-  const [bank, setBank] = useState("");
+  const [bankTujuan, setBankTujuan] = useState("");
+  const [namaPengirim, setNamaPengirim] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     supabase.from("settings").select("key,value").then(({ data }) => {
       const b = data?.find(i => i.key === "deposit_bank");
-      setBank(b?.value || "");
+      setBankTujuan(b?.value || "");
     });
   }, []);
 
   const submit = async () => {
+    const amt = Number(amount);
+    if (!amt) return alert("Masukkan jumlah deposit");
+    if (!namaPengirim) return alert("Masukkan nama pengirim");
+
     setLoading(true);
     try {
-      const amt = Number(amount);
-      const note = `Deposit ke rekening:\n${bank}`;
+      const note =
+        `Nama Pengirim: ${namaPengirim}\n` +
+        `Rekening Tujuan: ${bankTujuan}`;
 
       const { error } = await supabase.rpc("request_deposit", {
         req_amount: amt,
@@ -30,7 +37,7 @@ export default function Deposit() {
 
       if (error) throw error;
 
-      alert("Deposit diajukan. Menunggu konfirmasi admin.");
+      alert("Deposit diajukan, menunggu konfirmasi admin");
       router.push("/transaksi");
     } catch (e) {
       alert(e.message);
@@ -44,8 +51,8 @@ export default function Deposit() {
       <h1>Deposit</h1>
 
       <div style={card}>
-        <p>Rekening tujuan:</p>
-        <b>{bank}</b>
+        <p>Rekening Tujuan Deposit:</p>
+        <b>{bankTujuan}</b>
 
         <input
           style={input}
@@ -54,18 +61,53 @@ export default function Deposit() {
           onChange={e => setAmount(e.target.value)}
         />
 
+        <input
+          style={input}
+          placeholder="Nama Pengirim"
+          value={namaPengirim}
+          onChange={e => setNamaPengirim(e.target.value)}
+        />
+
         <button style={btn} onClick={submit} disabled={loading}>
           {loading ? "Memproses..." : "Ajukan Deposit"}
         </button>
 
-        <p style={{ fontSize: 12, opacity: 0.7, marginTop: 10 }}>
-          Minimal deposit mengikuti aturan sistem (contoh: Rp 50.000).
+        <p style={noteText}>
+          Pastikan nama pengirim sesuai dengan transfer.
         </p>
       </div>
     </div>
   );
 }
 
-const card = { background: "white", padding: 20, borderRadius: 12 };
-const input = { width: "100%", padding: 10, margin: "12px 0" };
-const btn = { width: "100%", padding: 12, background: "#0b1c2d", color: "white", border: 0, borderRadius: 10 };
+const card = {
+  background: "white",
+  padding: 20,
+  borderRadius: 12,
+  boxShadow: "0 6px 16px rgba(0,0,0,0.06)"
+};
+
+const input = {
+  width: "100%",
+  padding: 10,
+  margin: "8px 0",
+  borderRadius: 8,
+  border: "1px solid #ddd"
+};
+
+const btn = {
+  width: "100%",
+  padding: 12,
+  marginTop: 10,
+  background: "#0b1c2d",
+  color: "white",
+  border: 0,
+  borderRadius: 10,
+  cursor: "pointer"
+};
+
+const noteText = {
+  fontSize: 12,
+  opacity: 0.7,
+  marginTop: 10
+};
