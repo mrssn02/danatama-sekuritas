@@ -5,15 +5,34 @@ import { supabase } from "../lib/supabase";
 
 export default function Header() {
   const [user, setUser] = useState(null);
+  const [username, setUsername] = useState("");
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    // ambil user
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+      if (data.user) fetchProfile(data.user.id);
+    });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) =>
-      setUser(s?.user ?? null)
-    );
+    // listen perubahan auth
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      setUser(s?.user ?? null);
+      if (s?.user) fetchProfile(s.user.id);
+      else setUsername("");
+    });
+
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  const fetchProfile = async (userId) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("username")
+      .eq("id", userId)
+      .single();
+
+    if (!error && data) setUsername(data.username);
+  };
 
   const logout = async () => {
     await supabase.auth.signOut();
@@ -43,7 +62,12 @@ export default function Header() {
             <a href="/daftar" style={link}>Daftar</a>
           </>
         ) : (
-          <button onClick={logout} style={btn}>Logout</button>
+          <>
+            <span style={{ color: "#cbd5e1" }}>
+              Halo, <b>{username || "User"}</b>
+            </span>
+            <button onClick={logout} style={btn}>Logout</button>
+          </>
         )}
       </nav>
     </header>
@@ -60,7 +84,7 @@ const header = {
 };
 
 const brand = { display: "flex", gap: 16, alignItems: "center" };
-const nav = { display: "flex", gap: 16 };
+const nav = { display: "flex", gap: 16, alignItems: "center" };
 const link = { color: "white", textDecoration: "none" };
 const btn = {
   background: "transparent",
