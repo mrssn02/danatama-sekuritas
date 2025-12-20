@@ -4,22 +4,19 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
+const MIN_WITHDRAW = 100000;
+
 export default function Withdraw() {
   const router = useRouter();
-
   const [balance, setBalance] = useState(0);
   const [amount, setAmount] = useState("");
   const [bank, setBank] = useState("");
-  const [rekening, setRekening] = useState("");
-  const [atasNama, setAtasNama] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [rek, setRek] = useState("");
+  const [name, setName] = useState("");
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) {
-        router.push("/login");
-        return;
-      }
+      if (!data.user) return router.push("/login");
 
       const w = await supabase
         .from("wallets")
@@ -27,136 +24,69 @@ export default function Withdraw() {
         .eq("user_id", data.user.id)
         .single();
 
-      setBalance(Number(w.data?.balance || 0));
+      setBalance(w.data?.balance || 0);
     });
   }, []);
 
   const submit = async () => {
-    if (!amount || Number(amount) <= 0) {
-      alert("Jumlah withdraw tidak valid");
+    const amt = Number(amount);
+
+    if (!amt || amt < MIN_WITHDRAW) {
+      alert(`Minimal withdraw Rp ${MIN_WITHDRAW.toLocaleString("id-ID")}`);
       return;
     }
 
-    if (Number(amount) > balance) {
+    if (amt > balance) {
       alert("Saldo tidak mencukupi");
       return;
     }
 
-    if (!bank || !rekening || !atasNama) {
+    if (!bank || !rek || !name) {
       alert("Lengkapi data rekening tujuan");
       return;
     }
 
-    setLoading(true);
-
     const { data } = await supabase.auth.getUser();
-    if (!data.user) return;
 
-    const note = `
-Bank Tujuan : ${bank}
-No Rekening : ${rekening}
-Atas Nama   : ${atasNama}
-    `.trim();
-
-    const { error } = await supabase.from("transactions").insert({
+    await supabase.from("transactions").insert({
       user_id: data.user.id,
       type: "withdraw",
-      amount: Number(amount),
-      note
+      amount: amt,
+      note:
+        `Bank Tujuan : ${bank}\n` +
+        `No Rekening : ${rek}\n` +
+        `Atas Nama   : ${name}`
     });
 
-    setLoading(false);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    alert("Withdraw berhasil diajukan. Menunggu persetujuan admin.");
+    alert("Withdraw diajukan, menunggu persetujuan admin");
     router.push("/transaksi");
   };
 
   return (
-    <div style={wrap}>
+    <div style={{ maxWidth: 420, margin: "0 auto" }}>
       <h1>Withdraw</h1>
 
       <div style={card}>
-        <p>
-          Saldo tersedia:{" "}
-          <b>Rp {balance.toLocaleString("id-ID")}</b>
-        </p>
+        <p>Saldo: <b>Rp {balance.toLocaleString("id-ID")}</b></p>
 
-        <input
-          style={input}
-          placeholder="Jumlah Withdraw"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-        />
+        <input style={input} placeholder="Jumlah Withdraw" value={amount}
+          onChange={e => setAmount(e.target.value)} />
 
-        <hr style={{ margin: "16px 0" }} />
+        <input style={input} placeholder="Nama Bank" value={bank}
+          onChange={e => setBank(e.target.value)} />
 
-        <h3>Rekening Tujuan</h3>
+        <input style={input} placeholder="No Rekening" value={rek}
+          onChange={e => setRek(e.target.value)} />
 
-        <input
-          style={input}
-          placeholder="Nama Bank (contoh: BCA)"
-          value={bank}
-          onChange={(e) => setBank(e.target.value)}
-        />
+        <input style={input} placeholder="Atas Nama" value={name}
+          onChange={e => setName(e.target.value)} />
 
-        <input
-          style={input}
-          placeholder="Nomor Rekening"
-          value={rekening}
-          onChange={(e) => setRekening(e.target.value)}
-        />
-
-        <input
-          style={input}
-          placeholder="Atas Nama Rekening"
-          value={atasNama}
-          onChange={(e) => setAtasNama(e.target.value)}
-        />
-
-        <button style={btn} onClick={submit} disabled={loading}>
-          {loading ? "Memproses..." : "Ajukan Withdraw"}
-        </button>
+        <button style={btn} onClick={submit}>Ajukan Withdraw</button>
       </div>
     </div>
   );
 }
 
-/* ================= STYLES ================= */
-
-const wrap = {
-  maxWidth: 520,
-  margin: "0 auto"
-};
-
-const card = {
-  background: "white",
-  padding: 24,
-  borderRadius: 14,
-  boxShadow: "0 10px 24px rgba(0,0,0,0.08)"
-};
-
-const input = {
-  width: "100%",
-  padding: 12,
-  marginBottom: 12,
-  borderRadius: 10,
-  border: "1px solid #ddd",
-  fontSize: 14
-};
-
-const btn = {
-  width: "100%",
-  padding: 12,
-  background: "#0b1c2d",
-  color: "white",
-  border: "none",
-  borderRadius: 10,
-  fontSize: 15,
-  cursor: "pointer",
-  marginTop: 10
-};
+const card = { background:"white", padding:20, borderRadius:12 };
+const input = { width:"100%", padding:10, margin:"8px 0" };
+const btn = { width:"100%", padding:12, background:"#0b1c2d", color:"white", border:0 };
