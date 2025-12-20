@@ -10,10 +10,7 @@ export default function Transaksi() {
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) {
-        router.push("/login");
-        return;
-      }
+      if (!data.user) return router.push("/login");
 
       const { data: trx } = await supabase
         .from("transactions")
@@ -33,66 +30,44 @@ export default function Transaksi() {
 
       {data.map(t => (
         <div key={t.id} style={card}>
-          <p>
-            <b>{t.type.toUpperCase()}</b> — Rp{" "}
-            {Number(t.amount).toLocaleString("id-ID")}
-          </p>
+          <div style={row}>
+            <b>{t.type.toUpperCase()}</b>
+            <span style={badge(t.status)}>{t.status}</span>
+          </div>
 
-          <p>Status: <b>{t.status}</b></p>
+          <p>Rp {Number(t.amount).toLocaleString("id-ID")}</p>
 
-          {t.note && (
-            <>
-              <p style={label}>Detail Pengajuan:</p>
-              <pre style={box}>{t.note}</pre>
-            </>
-          )}
-
+          {t.note && <pre style={box}>{t.note}</pre>}
           {t.admin_note && (
-            <>
-              <p style={label}>Keterangan Admin:</p>
-              <pre style={adminBox}>{t.admin_note}</pre>
-            </>
+            <pre style={adminBox}>Admin: {t.admin_note}</pre>
           )}
 
-          <p style={date}>
-            {new Date(t.created_at).toLocaleString("id-ID")}
-          </p>
+          <small>{new Date(t.created_at).toLocaleString("id-ID")}</small>
         </div>
       ))}
     </div>
   );
 }
 
-const card = {
-  background: "white",
-  padding: 16,
+const badge = (status) => ({
+  padding: "4px 10px",
   borderRadius: 12,
-  boxShadow: "0 6px 16px rgba(0,0,0,0.06)",
-  marginBottom: 14
-};
-
-const label = {
-  fontSize: 13,
-  fontWeight: 600,
-  marginTop: 8
-};
-
-const box = {
-  background: "#f8fafc",
-  padding: 10,
-  borderRadius: 8,
-  fontSize: 13,
-  whiteSpace: "pre-wrap"
-};
-
-const adminBox = {
-  ...box,
-  background: "#ecfeff",
-  borderLeft: "4px solid #06b6d4"
-};
-
-const date = {
   fontSize: 12,
-  opacity: 0.6,
-  marginTop: 6
+  color: "white",
+  background:
+    status === "approved" ? "#16a34a" :
+    status === "rejected" ? "#dc2626" :
+    "#ca8a04"
+});
+
+const card = {
+  background:"white",
+  padding:16,
+  borderRadius:12,
+  marginBottom:14,
+  boxShadow:"0 6px 16px rgba(0,0,0,0.06)"
 };
+
+const row = { display:"flex", justifyContent:"space-between" };
+const box = { background:"#f8fafc", padding:10, borderRadius:8, fontSize:13 };
+const adminBox = { ...box, background:"#ecfeff", borderLeft:"4px solid #06b6d4" };
