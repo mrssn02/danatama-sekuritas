@@ -55,6 +55,7 @@ export default function Header() {
           <div style={topMenu}>
             {!user ? (
               <>
+                <a href="/investasi" style={link}>Investasi</a>
                 <a href="/login" style={link}>Login</a>
                 <a href="/daftar" style={link}>Daftar</a>
               </>
