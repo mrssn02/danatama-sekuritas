@@ -1,45 +1,72 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
-export default function Investasi() {
-  const [products, setProducts] = useState([]);
+export default function Transaksi() {
+  const router = useRouter();
+  const [data, setData] = useState([]);
 
   useEffect(() => {
-    supabase.from("investment_products")
-      .select("*")
-      .then(({ data }) => setProducts(data || []));
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return router.push("/login");
+
+      const { data: trx } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", data.user.id)
+        .order("created_at", { ascending: false });
+
+      setData(trx || []);
+    });
   }, []);
 
   return (
-    <>
-      <h1>Produk Investasi</h1>
+    <div style={{ maxWidth: 900, margin: "0 auto" }}>
+      <h1>Riwayat Transaksi</h1>
 
-      <div style={grid}>
-        {products.map(p => (
-          <div key={p.id} style={card}>
-            <h3>{p.name}</h3>
-            <p>Risiko: <b>{p.risk}</b></p>
-            <p>Estimasi Return: <b>{p.return_pct}% / tahun</b></p>
-            <p>{p.description}</p>
-            <a href="/dashboard">Investasi</a>
+      {data.length === 0 && <p>Belum ada transaksi.</p>}
+
+      {data.map(t => (
+        <div key={t.id} style={card}>
+          <div style={row}>
+            <b>{t.type.toUpperCase()}</b>
+            <span style={badge(t.status)}>{t.status}</span>
           </div>
-        ))}
-      </div>
-    </>
+
+          <p>Rp {Number(t.amount).toLocaleString("id-ID")}</p>
+
+          {t.note && <pre style={box}>{t.note}</pre>}
+          {t.admin_note && <pre style={adminBox}>Admin: {t.admin_note}</pre>}
+
+          <small style={{ opacity: 0.65 }}>
+            {new Date(t.created_at).toLocaleString("id-ID")}
+          </small>
+        </div>
+      ))}
+    </div>
   );
 }
 
-const grid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))",
-  gap: 20
-};
+const badge = (status) => ({
+  padding: "4px 10px",
+  borderRadius: 12,
+  fontSize: 12,
+  color: "white",
+  background:
+    status === "approved" ? "#16a34a" :
+    status === "rejected" ? "#dc2626" :
+    "#ca8a04"
+});
 
 const card = {
   background: "white",
-  padding: 20,
+  padding: 16,
   borderRadius: 12,
-  boxShadow: "0 4px 12px rgba(0,0,0,.05)"
+  marginBottom: 14,
+  boxShadow: "0 6px 16px rgba(0,0,0,0.06)"
 };
+const row = { display: "flex", justifyContent: "space-between", alignItems: "center" };
+const box = { background: "#f8fafc", padding: 10, borderRadius: 8, fontSize: 13, whiteSpace: "pre-wrap" };
+const adminBox = { ...box, background: "#ecfeff", borderLeft: "4px solid #06b6d4" };
