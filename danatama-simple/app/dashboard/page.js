@@ -1,52 +1,48 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
 export default function Dashboard() {
-  const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [username, setUsername] = useState("");
+  const [investments, setInvestments] = useState([]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
-        router.push("/login");
-      } else {
-        setUser(data.user);
-        fetchProfile(data.user.id);
-      }
+      if (!data.user) return;
+
+      supabase.from("user_investments")
+        .select("amount, investment_products(name)")
+        .eq("user_id", data.user.id)
+        .then(({ data }) => setInvestments(data || []));
     });
   }, []);
 
-  const fetchProfile = async (userId) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("username")
-      .eq("id", userId)
-      .single();
-
-    if (data) setUsername(data.username);
-  };
-
   return (
-    <div style={{ maxWidth: 600 }}>
-      <h1>Dashboard</h1>
+    <>
+      <h1>Dashboard Investasi</h1>
 
       <div style={card}>
-        <p><b>Username:</b> {username}</p>
-        <p><b>Email:</b> {user?.email}</p>
-        <p><b>Status:</b> Login aktif</p>
+        <h3>Portofolio Anda</h3>
+
+        {investments.length === 0 && (
+          <p>Belum ada investasi.</p>
+        )}
+
+        {investments.map((i, idx) => (
+          <p key={idx}>
+            {i.investment_products.name} – Rp {i.amount}
+          </p>
+        ))}
       </div>
-    </div>
+
+      <a href="/investasi">+ Tambah Investasi</a>
+    </>
   );
 }
 
 const card = {
-  marginTop: 20,
-  padding: 20,
   background: "white",
+  padding: 20,
   borderRadius: 12,
-  boxShadow: "0 4px 12px rgba(0,0,0,0.05)"
+  marginBottom: 20
 };
