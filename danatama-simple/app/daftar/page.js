@@ -13,15 +13,13 @@ export default function Daftar() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   const submit = async (e) => {
     e.preventDefault();
     setError("");
-    setSuccess("");
 
-    if (!username.trim()) {
-      setError("Username wajib diisi");
+    if (!username || !email) {
+      setError("Username dan email wajib diisi");
       return;
     }
 
@@ -38,55 +36,40 @@ export default function Daftar() {
     setLoading(true);
 
     try {
-      // ===============================
-      // 1. SIGN UP AUTH
-      // ===============================
-      const { data, error: authError } = await supabase.auth.signUp({
+      // 1️⃣ AUTH SIGN UP
+      const { data, error: authErr } = await supabase.auth.signUp({
         email,
         password
       });
 
-      if (authError) throw authError;
-      if (!data.user) throw new Error("User tidak berhasil dibuat");
+      if (authErr) throw authErr;
+      if (!data.user) throw new Error("Gagal membuat user");
 
       const userId = data.user.id;
 
-      // ===============================
-      // 2. INSERT PROFILE
-      // ===============================
-      const { error: profileError } = await supabase
+      // 2️⃣ INSERT PROFILE (USERNAME + EMAIL)
+      const { error: profileErr } = await supabase
         .from("profiles")
         .insert({
           id: userId,
-          username
+          username,
+          email
         });
 
-      if (profileError) throw profileError;
+      if (profileErr) throw profileErr;
 
-      // ===============================
-      // 3. CREATE WALLET (WAJIB)
-      // ===============================
-      const { error: walletError } = await supabase
+      // 3️⃣ CREATE WALLET (BALANCE = 0)
+      const { error: walletErr } = await supabase
         .from("wallets")
         .insert({
           user_id: userId,
           balance: 0
         });
 
-      if (walletError) throw walletError;
+      if (walletErr) throw walletErr;
 
-      // ===============================
-      // SELESAI
-      // ===============================
-      setSuccess("Pendaftaran berhasil. Silakan login.");
-      setUsername("");
-      setEmail("");
-      setPassword("");
-      setConfirm("");
-
-      setTimeout(() => {
-        router.push("/login");
-      }, 1200);
+      alert("Pendaftaran berhasil, silakan login");
+      router.push("/login");
 
     } catch (err) {
       console.error(err);
@@ -106,7 +89,6 @@ export default function Daftar() {
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          required
         />
 
         <input
@@ -115,16 +97,14 @@ export default function Daftar() {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          required
         />
 
         <input
           style={input}
           type="password"
-          placeholder="Password (min. 6 karakter)"
+          placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          required
         />
 
         <input
@@ -133,7 +113,6 @@ export default function Daftar() {
           placeholder="Konfirmasi Password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
-          required
         />
 
         <button style={btn} disabled={loading}>
@@ -141,18 +120,14 @@ export default function Daftar() {
         </button>
 
         {error && <p style={err}>{error}</p>}
-        {success && <p style={ok}>{success}</p>}
       </form>
     </div>
   );
 }
 
-/* ================= STYLES ================= */
+/* ===== STYLES ===== */
 
-const wrap = {
-  maxWidth: 420,
-  margin: "0 auto"
-};
+const wrap = { maxWidth: 420, margin: "0 auto" };
 
 const card = {
   background: "white",
@@ -164,10 +139,9 @@ const card = {
 const input = {
   width: "100%",
   padding: 12,
-  marginBottom: 14,
+  marginBottom: 12,
   borderRadius: 10,
-  border: "1px solid #ddd",
-  fontSize: 14
+  border: "1px solid #ddd"
 };
 
 const btn = {
@@ -177,18 +151,7 @@ const btn = {
   color: "white",
   border: "none",
   borderRadius: 10,
-  fontSize: 15,
   cursor: "pointer"
 };
 
-const err = {
-  color: "#b91c1c",
-  marginTop: 12,
-  fontSize: 13
-};
-
-const ok = {
-  color: "#15803d",
-  marginTop: 12,
-  fontSize: 13
-};
+const err = { color: "red", marginTop: 10, fontSize: 13 };
