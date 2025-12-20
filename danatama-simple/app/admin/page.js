@@ -9,8 +9,8 @@ const ADMIN_EMAIL = "sonandra111@gmail.com";
 export default function Admin() {
   const router = useRouter();
 
-  const [tx, setTx] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState([]);
 
   // settings
   const [depositBank, setDepositBank] = useState("");
@@ -22,11 +22,15 @@ export default function Admin() {
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return router.push("/login");
+      if (!data.user) {
+        router.push("/login");
+        return;
+      }
 
       if (data.user.email !== ADMIN_EMAIL) {
-        alert("Akses ditolak");
-        return router.push("/");
+        alert("Akses admin ditolak");
+        router.push("/");
+        return;
       }
 
       await loadAll();
@@ -41,7 +45,7 @@ export default function Admin() {
       .eq("status", "pending")
       .order("created_at", { ascending: false });
 
-    setTx(trx || []);
+    setTransactions(trx || []);
 
     const { data: s } = await supabase.from("settings").select("key,value");
     if (s) {
@@ -50,15 +54,30 @@ export default function Admin() {
     }
   };
 
-  // ================= APPROVE / REJECT =================
+  // ================= ACC / REJECT =================
   const approve = async (t) => {
-    await supabase.from("transactions")
-      .update({ status: "approved" })
+    const adminNote = prompt(
+      "Masukkan keterangan admin (wajib):\nContoh:\nDana sudah diterima / Transfer via BCA 14:30"
+    );
+
+    if (!adminNote) {
+      alert("Keterangan admin wajib diisi");
+      return;
+    }
+
+    await supabase
+      .from("transactions")
+      .update({
+        status: "approved",
+        admin_note: adminNote
+      })
       .eq("id", t.id);
 
     await supabase.rpc("adjust_balance", {
       uid: t.user_id,
-      amt: t.type === "deposit" ? Number(t.amount) : -Number(t.amount)
+      amt: t.type === "deposit"
+        ? Number(t.amount)
+        : -Number(t.amount)
     });
 
     alert("Transaksi berhasil di-ACC");
@@ -66,8 +85,14 @@ export default function Admin() {
   };
 
   const reject = async (t) => {
-    await supabase.from("transactions")
-      .update({ status: "rejected" })
+    const reason = prompt("Alasan penolakan (opsional):");
+
+    await supabase
+      .from("transactions")
+      .update({
+        status: "rejected",
+        admin_note: reason || "Ditolak oleh admin"
+      })
       .eq("id", t.id);
 
     alert("Transaksi ditolak");
@@ -81,14 +106,18 @@ export default function Admin() {
       .update({ value })
       .eq("key", key);
 
-    if (error) return alert(error.message);
-    alert("Pengaturan disimpan");
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("Pengaturan berhasil disimpan");
   };
 
-  // ================= MANUAL BALANCE (NO TRANSACTION LOG) =================
+  // ================= MANUAL BALANCE (NO LOG) =================
   const adjustManual = async () => {
     if (!search || !amount) {
-      alert("Lengkapi pencarian user dan jumlah");
+      alert("Username/email dan jumlah wajib diisi");
       return;
     }
 
@@ -100,7 +129,7 @@ export default function Admin() {
 
     let userId = null;
 
-    // 1️⃣ cari berdasarkan username
+    // cari via username
     const { data: profile } = await supabase
       .from("profiles")
       .select("id")
@@ -110,9 +139,9 @@ export default function Admin() {
     if (profile?.id) {
       userId = profile.id;
     } else {
-      // 2️⃣ cari berdasarkan email
-      const { data: users } = await supabase.auth.admin.listUsers();
-      const found = users.users.find(u => u.email === search);
+      // cari via email
+      const { data } = await supabase.auth.admin.listUsers();
+      const found = data.users.find(u => u.email === search);
       if (found) userId = found.id;
     }
 
@@ -121,7 +150,6 @@ export default function Admin() {
       return;
     }
 
-    // === LANGSUNG ADJUST SALDO (TANPA RIWAYAT) ===
     await supabase.rpc("adjust_balance", {
       uid: userId,
       amt
@@ -135,10 +163,10 @@ export default function Admin() {
   if (loading) return <p>Loading admin panel...</p>;
 
   return (
-    <>
+    <div style={{ maxWidth: 1100, margin: "0 auto" }}>
       <h1>Panel Admin</h1>
 
-      {/* ================= SETTINGS ================= */}
+      {/* ========== SETTINGS ========== */}
       <div style={grid}>
         <div style={card}>
           <h3>Rekening Deposit</h3>
@@ -166,54 +194,50 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* ================= TRANSAKSI ================= */}
-      <div style={{ marginTop: 30 }}>
-        <h3>Deposit & Withdraw Pending</h3>
+      {/* ========== TRANSAKSI ========== */}
+      <h3 style={{ marginTop: 30 }}>Deposit & Withdraw Pending</h3>
 
-        {tx.length === 0 && <p>Tidak ada transaksi pending</p>}
+      {transactions.length === 0 && <p>Tidak ada transaksi pending</p>}
 
-        {tx.map(t => (
-          <div key={t.id} style={card}>
-            <p>
-              <b>{t.type.toUpperCase()}</b> — Rp {Number(t.amount).toLocaleString("id-ID")}
-            </p>
+      {transactions.map(t => (
+        <div key={t.id} style={card}>
+          <p>
+            <b>{t.type.toUpperCase()}</b> — Rp{" "}
+            {Number(t.amount).toLocaleString("id-ID")}
+          </p>
 
-            {/* === INFO REKENING WD === */}
-            {t.type === "withdraw" && t.note && (
-              <pre style={noteBox}>{t.note}</pre>
-            )}
+          {t.type === "withdraw" && t.note && (
+            <pre style={noteBox}>{t.note}</pre>
+          )}
 
-            <div style={{ display: "flex", gap: 10 }}>
-              <button style={btn} onClick={() => approve(t)}>ACC</button>
-              <button style={btnDanger} onClick={() => reject(t)}>Reject</button>
-            </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button style={btn} onClick={() => approve(t)}>ACC</button>
+            <button style={btnDanger} onClick={() => reject(t)}>Reject</button>
           </div>
-        ))}
-      </div>
-
-      {/* ================= MANUAL BALANCE ================= */}
-      <div style={{ marginTop: 30 }}>
-        <h3>Tambah / Kurangi Saldo Manual</h3>
-
-        <div style={card}>
-          <input
-            style={input}
-            placeholder="Username atau Email"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <input
-            style={input}
-            placeholder="Jumlah (contoh: 50000 atau -50000)"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-          <button style={btn} onClick={adjustManual}>
-            Simpan Saldo
-          </button>
         </div>
+      ))}
+
+      {/* ========== MANUAL BALANCE ========== */}
+      <h3 style={{ marginTop: 30 }}>Tambah / Kurangi Saldo Manual</h3>
+
+      <div style={card}>
+        <input
+          style={input}
+          placeholder="Username atau Email"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <input
+          style={input}
+          placeholder="Jumlah (contoh: 50000 atau -50000)"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+        <button style={btn} onClick={adjustManual}>
+          Simpan Saldo
+        </button>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -230,7 +254,7 @@ const card = {
   padding: 16,
   borderRadius: 12,
   boxShadow: "0 8px 18px rgba(0,0,0,0.06)",
-  marginBottom: 12
+  marginBottom: 14
 };
 
 const input = {
