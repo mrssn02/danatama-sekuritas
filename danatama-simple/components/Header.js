@@ -63,6 +63,7 @@ export default function Header() {
           </>
         ) : (
           <>
+            <a href="/dashboard" style={link}>Dashboard</a>
             <span style={{ color: "#cbd5e1" }}>
               Halo, <b>{username || "User"}</b>
             </span>
