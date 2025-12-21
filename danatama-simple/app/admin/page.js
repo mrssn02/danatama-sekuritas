@@ -3,11 +3,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
-const ADMIN_EMAILS = ["sonandra111@gmail.com"];
-
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
-  const [authorized, setAuthorized] = useState(false);
+  const [adminRole, setAdminRole] = useState(null);
 
   const [depositBank, setDepositBank] = useState("");
   const [csWhatsapp, setCsWhatsapp] = useState("");
@@ -20,25 +18,30 @@ export default function AdminPage() {
 
   const [processingId, setProcessingId] = useState(null);
 
-  // ===============================
-  // AUTH & INIT
-  // ===============================
+  /* ===============================
+     AUTH & INIT
+  =============================== */
   useEffect(() => {
     const init = async () => {
       const { data: auth } = await supabase.auth.getUser();
-
       if (!auth?.user) {
         window.location.href = "/login";
         return;
       }
 
-      if (!ADMIN_EMAILS.includes(auth.user.email)) {
+      const { data: admin } = await supabase
+        .from("admins")
+        .select("role")
+        .eq("id", auth.user.id)
+        .single();
+
+      if (!admin) {
         alert("Akses admin ditolak");
         window.location.href = "/";
         return;
       }
 
-      setAuthorized(true);
+      setAdminRole(admin.role);
       await loadSettings();
       await loadPending();
       setLoading(false);
@@ -47,12 +50,11 @@ export default function AdminPage() {
     init();
   }, []);
 
-  // ===============================
-  // LOAD DATA
-  // ===============================
+  /* ===============================
+     LOAD DATA
+  =============================== */
   const loadSettings = async () => {
     const { data } = await supabase.from("settings").select("*");
-
     data?.forEach((s) => {
       if (s.key === "deposit_bank") setDepositBank(s.value);
       if (s.key === "cs_whatsapp") setCsWhatsapp(s.value);
@@ -69,23 +71,22 @@ export default function AdminPage() {
     setTransactions(data || []);
   };
 
-  // ===============================
-  // SETTINGS
-  // ===============================
+  /* ===============================
+     SETTINGS
+  =============================== */
   const saveSetting = async (key, value) => {
     await supabase.from("settings").upsert({ key, value });
     alert("Tersimpan");
   };
 
-  // ===============================
-  // TRANSACTION ACTIONS
-  // ===============================
+  /* ===============================
+     APPROVE TRANSACTION (SAFE)
+  =============================== */
   const approveTx = async (tx) => {
-    if (processingId === tx.id) return;
-
+    if (processingId) return;
     setProcessingId(tx.id);
 
-    // LOCK: pastikan masih pending
+    // pastikan masih pending
     const { data: fresh } = await supabase
       .from("transactions")
       .select("status")
@@ -95,12 +96,11 @@ export default function AdminPage() {
     if (!fresh || fresh.status !== "pending") {
       alert("Transaksi sudah diproses");
       setProcessingId(null);
-      loadPending();
       return;
     }
 
-    // update status
-    const { error } = await supabase
+    // update status dulu
+    await supabase
       .from("transactions")
       .update({
         status: "approved",
@@ -109,43 +109,40 @@ export default function AdminPage() {
       })
       .eq("id", tx.id);
 
-    if (error) {
-      alert(error.message);
-      setProcessingId(null);
-      return;
-    }
-
-    // update saldo SEKALI SAJA
+    // update saldo (1x saja)
     const amount = tx.type === "deposit" ? tx.amount : -tx.amount;
+    await supabase
+      .from("wallets")
+      .update({
+        balance: supabase.rpc
+          ? undefined
+          : undefined,
+      });
 
-    const { error: balErr } = await supabase.rpc("adjust_balance", {
+    await supabase.rpc("adjust_balance", {
       uid: tx.user_id,
       amt: amount,
     });
-
-    if (balErr) {
-      alert(balErr.message);
-      setProcessingId(null);
-      return;
-    }
 
     alert("Transaksi di-ACC");
     setProcessingId(null);
     loadPending();
   };
 
+  /* ===============================
+     REJECT TRANSACTION
+  =============================== */
   const rejectTx = async (tx) => {
     const note = adminNotes[tx.id];
-
     if (!note) {
-      alert("Masukkan alasan penolakan");
+      alert("Isi alasan penolakan");
       return;
     }
 
-    if (processingId === tx.id) return;
+    if (processingId) return;
     setProcessingId(tx.id);
 
-    const { error } = await supabase
+    await supabase
       .from("transactions")
       .update({
         status: "rejected",
@@ -154,113 +151,93 @@ export default function AdminPage() {
       })
       .eq("id", tx.id);
 
-    if (error) {
-      alert(error.message);
-      setProcessingId(null);
-      return;
-    }
-
     alert("Transaksi ditolak");
     setProcessingId(null);
     loadPending();
   };
 
-  // ===============================
-  // MANUAL BALANCE (AMAN & FIX)
-  // ===============================
+  /* ===============================
+     MANUAL BALANCE (EMAIL BASED)
+  =============================== */
   const manualAdjust = async () => {
     if (!manualEmail || !manualAmount) {
-      alert("Email dan nominal wajib diisi");
+      alert("Email & nominal wajib diisi");
       return;
     }
 
-    const { error } = await supabase.rpc(
-      "admin_adjust_balance_by_email",
-      {
-        p_email: manualEmail.trim(),
-        p_amount: Number(manualAmount),
-      }
-    );
+    const { data: user } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", manualEmail)
+      .single();
 
-    if (error) {
-      alert(error.message);
+    if (!user) {
+      alert("User tidak ditemukan");
       return;
     }
+
+    await supabase.rpc("adjust_balance", {
+      uid: user.id,
+      amt: Number(manualAmount),
+    });
 
     alert("Saldo berhasil diubah");
     setManualEmail("");
     setManualAmount("");
   };
 
-  // ===============================
-  // RENDER
-  // ===============================
+  /* ===============================
+     RENDER
+  =============================== */
   if (loading) return <p>Memuat...</p>;
-  if (!authorized) return null;
 
   return (
     <div style={{ maxWidth: 900 }}>
       <h1>Admin Panel</h1>
 
       {/* SETTINGS */}
-      <div style={card}>
-        <h3>Rekening Deposit</h3>
-        <input
-          value={depositBank}
-          onChange={(e) => setDepositBank(e.target.value)}
-        />
-        <button onClick={() => saveSetting("deposit_bank", depositBank)}>
-          Simpan
-        </button>
-      </div>
+      {(adminRole === "super_admin" || adminRole === "admin_finance") && (
+        <>
+          <div style={card}>
+            <h3>Rekening Deposit</h3>
+            <input value={depositBank} onChange={(e) => setDepositBank(e.target.value)} />
+            <button onClick={() => saveSetting("deposit_bank", depositBank)}>Simpan</button>
+          </div>
 
-      <div style={card}>
-        <h3>CS WhatsApp</h3>
-        <input
-          value={csWhatsapp}
-          onChange={(e) => setCsWhatsapp(e.target.value)}
-        />
-        <button onClick={() => saveSetting("cs_whatsapp", csWhatsapp)}>
-          Simpan
-        </button>
-      </div>
+          <div style={card}>
+            <h3>CS WhatsApp</h3>
+            <input value={csWhatsapp} onChange={(e) => setCsWhatsapp(e.target.value)} />
+            <button onClick={() => saveSetting("cs_whatsapp", csWhatsapp)}>Simpan</button>
+          </div>
+        </>
+      )}
 
       {/* TRANSACTIONS */}
       <div style={card}>
         <h3>Deposit & Withdraw Pending</h3>
 
-        {transactions.length === 0 && (
-          <p>Tidak ada transaksi pending.</p>
-        )}
+        {transactions.length === 0 && <p>Tidak ada transaksi pending.</p>}
 
         {transactions.map((t) => (
           <div key={t.id} style={tx}>
             <p>
-              <b>{t.type.toUpperCase()}</b> — Rp{" "}
-              {t.amount.toLocaleString()}
+              <b>{t.type.toUpperCase()}</b> — Rp {t.amount.toLocaleString()}
             </p>
 
             {t.note && <p>Catatan User: {t.note}</p>}
 
             <textarea
-              placeholder="Catatan admin (wajib untuk reject)"
+              placeholder="Catatan admin"
               value={adminNotes[t.id] || ""}
               onChange={(e) =>
-                setAdminNotes({
-                  ...adminNotes,
-                  [t.id]: e.target.value,
-                })
+                setAdminNotes({ ...adminNotes, [t.id]: e.target.value })
               }
               style={{ width: "100%", marginBottom: 8 }}
             />
 
-            <button
-              disabled={processingId === t.id}
-              onClick={() => approveTx(t)}
-            >
+            <button disabled={processingId === t.id} onClick={() => approveTx(t)}>
               ACC
             </button>
-
             <button
               disabled={processingId === t.id}
               onClick={() => rejectTx(t)}
@@ -273,21 +250,23 @@ export default function AdminPage() {
       </div>
 
       {/* MANUAL BALANCE */}
-      <div style={card}>
-        <h3>Tambah / Kurangi Saldo Manual</h3>
-        <input
-          placeholder="Email user"
-          value={manualEmail}
-          onChange={(e) => setManualEmail(e.target.value)}
-        />
-        <input
-          type="number"
-          placeholder="Nominal (+ / -)"
-          value={manualAmount}
-          onChange={(e) => setManualAmount(e.target.value)}
-        />
-        <button onClick={manualAdjust}>Simpan Saldo</button>
-      </div>
+      {(adminRole === "super_admin" || adminRole === "admin_finance" || adminRole === "admin_it") && (
+        <div style={card}>
+          <h3>Tambah / Kurangi Saldo Manual</h3>
+          <input
+            placeholder="Email user"
+            value={manualEmail}
+            onChange={(e) => setManualEmail(e.target.value)}
+          />
+          <input
+            type="number"
+            placeholder="Nominal (+ / -)"
+            value={manualAmount}
+            onChange={(e) => setManualAmount(e.target.value)}
+          />
+          <button onClick={manualAdjust}>Simpan Saldo</button>
+        </div>
+      )}
     </div>
   );
 }
