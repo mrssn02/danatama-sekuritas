@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 /**
- * ADMIN EMAIL YANG DIIZINKAN
- * (sementara hardcode agar tidak rusak)
+ * DAFTAR EMAIL ADMIN
+ * (sementara PAKAI INI DULU biar aman & gak rusak)
  */
 const ADMIN_EMAILS = ["sonandra111@gmail.com"];
 
@@ -17,26 +17,26 @@ export default function AdminPage() {
   const [csWhatsapp, setCsWhatsapp] = useState("");
 
   const [transactions, setTransactions] = useState([]);
-
   const [adminNotes, setAdminNotes] = useState({});
-  const [processingId, setProcessingId] = useState(null);
 
   const [manualEmail, setManualEmail] = useState("");
   const [manualAmount, setManualAmount] = useState("");
 
-  // ===============================
-  // AUTH & INIT
-  // ===============================
+  const [processingId, setProcessingId] = useState(null);
+
+  /* ===============================
+     AUTH
+  =============================== */
   useEffect(() => {
     const init = async () => {
-      const { data: auth } = await supabase.auth.getUser();
+      const { data } = await supabase.auth.getUser();
 
-      if (!auth?.user) {
+      if (!data?.user) {
         window.location.href = "/login";
         return;
       }
 
-      if (!ADMIN_EMAILS.includes(auth.user.email)) {
+      if (!ADMIN_EMAILS.includes(data.user.email)) {
         alert("Akses admin ditolak");
         window.location.href = "/";
         return;
@@ -51,12 +51,11 @@ export default function AdminPage() {
     init();
   }, []);
 
-  // ===============================
-  // LOAD DATA
-  // ===============================
+  /* ===============================
+     LOAD DATA
+  =============================== */
   const loadSettings = async () => {
     const { data } = await supabase.from("settings").select("*");
-
     data?.forEach((s) => {
       if (s.key === "deposit_bank") setDepositBank(s.value);
       if (s.key === "cs_whatsapp") setCsWhatsapp(s.value);
@@ -73,21 +72,17 @@ export default function AdminPage() {
     setTransactions(data || []);
   };
 
-  // ===============================
-  // SETTINGS
-  // ===============================
+  /* ===============================
+     SETTINGS
+  =============================== */
   const saveSetting = async (key, value) => {
-    const { error } = await supabase.from("settings").upsert({ key, value });
-    if (error) {
-      alert(error.message);
-      return;
-    }
+    await supabase.from("settings").upsert({ key, value });
     alert("Tersimpan");
   };
 
-  // ===============================
-  // APPROVE TRANSACTION (AMAN)
-  // ===============================
+  /* ===============================
+     APPROVE / REJECT (AMAN)
+  =============================== */
   const approveTx = async (tx) => {
     if (processingId) return;
     setProcessingId(tx.id);
@@ -96,27 +91,23 @@ export default function AdminPage() {
 
     const { error } = await supabase.rpc("approve_transaction", {
       tx_id: tx.id,
-      admin_note: note,
+      p_admin_note: note,
     });
 
     if (error) {
       alert(error.message);
-      setProcessingId(null);
-      return;
+    } else {
+      alert("Transaksi di-ACC");
+      await loadPending();
     }
 
-    alert("Transaksi di-ACC");
     setProcessingId(null);
-    loadPending();
   };
 
-  // ===============================
-  // REJECT TRANSACTION
-  // ===============================
   const rejectTx = async (tx) => {
     const note = adminNotes[tx.id];
     if (!note) {
-      alert("Catatan admin wajib diisi untuk reject");
+      alert("Catatan admin wajib diisi");
       return;
     }
 
@@ -125,26 +116,25 @@ export default function AdminPage() {
 
     const { error } = await supabase.rpc("reject_transaction", {
       tx_id: tx.id,
-      admin_note: note,
+      p_admin_note: note,
     });
 
     if (error) {
       alert(error.message);
-      setProcessingId(null);
-      return;
+    } else {
+      alert("Transaksi ditolak");
+      await loadPending();
     }
 
-    alert("Transaksi ditolak");
     setProcessingId(null);
-    loadPending();
   };
 
-  // ===============================
-  // MANUAL BALANCE (TIDAK BUAT RIWAYAT)
-  // ===============================
+  /* ===============================
+     MANUAL BALANCE (EMAIL)
+  =============================== */
   const manualAdjust = async () => {
     if (!manualEmail || !manualAmount) {
-      alert("Email dan nominal wajib diisi");
+      alert("Email & nominal wajib diisi");
       return;
     }
 
@@ -166,17 +156,16 @@ export default function AdminPage() {
 
     if (error) {
       alert(error.message);
-      return;
+    } else {
+      alert("Saldo berhasil diubah");
+      setManualEmail("");
+      setManualAmount("");
     }
-
-    alert("Saldo berhasil diubah");
-    setManualEmail("");
-    setManualAmount("");
   };
 
-  // ===============================
-  // RENDER
-  // ===============================
+  /* ===============================
+     RENDER
+  =============================== */
   if (loading) return <p>Memuat...</p>;
   if (!authorized) return null;
 
@@ -184,30 +173,18 @@ export default function AdminPage() {
     <div style={{ maxWidth: 900 }}>
       <h1>Admin Panel</h1>
 
-      {/* SETTINGS */}
       <div style={card}>
         <h3>Rekening Deposit</h3>
-        <input
-          value={depositBank}
-          onChange={(e) => setDepositBank(e.target.value)}
-        />
-        <button onClick={() => saveSetting("deposit_bank", depositBank)}>
-          Simpan
-        </button>
+        <input value={depositBank} onChange={(e) => setDepositBank(e.target.value)} />
+        <button onClick={() => saveSetting("deposit_bank", depositBank)}>Simpan</button>
       </div>
 
       <div style={card}>
         <h3>CS WhatsApp</h3>
-        <input
-          value={csWhatsapp}
-          onChange={(e) => setCsWhatsapp(e.target.value)}
-        />
-        <button onClick={() => saveSetting("cs_whatsapp", csWhatsapp)}>
-          Simpan
-        </button>
+        <input value={csWhatsapp} onChange={(e) => setCsWhatsapp(e.target.value)} />
+        <button onClick={() => saveSetting("cs_whatsapp", csWhatsapp)}>Simpan</button>
       </div>
 
-      {/* TRANSACTIONS */}
       <div style={card}>
         <h3>Deposit & Withdraw Pending</h3>
 
@@ -215,12 +192,8 @@ export default function AdminPage() {
 
         {transactions.map((t) => (
           <div key={t.id} style={tx}>
-            <p>
-              <b>{t.type.toUpperCase()}</b> — Rp{" "}
-              {t.amount.toLocaleString()}
-            </p>
-
-            {t.note && <p>Catatan User: {t.note}</p>}
+            <b>{t.type.toUpperCase()}</b> — Rp {t.amount.toLocaleString()}
+            <p>Catatan User: {t.note || "-"}</p>
 
             <textarea
               placeholder="Catatan admin"
@@ -231,10 +204,7 @@ export default function AdminPage() {
               style={{ width: "100%", marginBottom: 8 }}
             />
 
-            <button
-              disabled={processingId === t.id}
-              onClick={() => approveTx(t)}
-            >
+            <button disabled={processingId === t.id} onClick={() => approveTx(t)}>
               ACC
             </button>
 
@@ -249,7 +219,6 @@ export default function AdminPage() {
         ))}
       </div>
 
-      {/* MANUAL BALANCE */}
       <div style={card}>
         <h3>Tambah / Kurangi Saldo Manual</h3>
         <input
@@ -263,7 +232,7 @@ export default function AdminPage() {
           value={manualAmount}
           onChange={(e) => setManualAmount(e.target.value)}
         />
-        <button onClick={manualAdjust}>Simpan Saldo</button>
+        <button onClick={manualAdjust}>Simpan</button>
       </div>
     </div>
   );
