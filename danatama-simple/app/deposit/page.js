@@ -60,7 +60,7 @@ export default function DepositPage() {
     }
 
     alert("Pengajuan deposit berhasil dikirim");
-    router.push("/dompet");
+    router.push("/wallet");
   };
 
   if (loading) {
