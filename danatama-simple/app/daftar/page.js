@@ -1,157 +1,136 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
-export default function Daftar() {
-  const router = useRouter();
-
-  const [username, setUsername] = useState("");
+export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  const submit = async (e) => {
-    e.preventDefault();
-    setError("");
-
-    if (!username || !email) {
-      setError("Username dan email wajib diisi");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("Password minimal 6 karakter");
+  const register = async () => {
+    if (!email || !password || !confirm) {
+      alert("Semua field wajib diisi");
       return;
     }
 
     if (password !== confirm) {
-      setError("Password dan konfirmasi tidak sama");
+      alert("Konfirmasi password tidak cocok");
       return;
     }
 
     setLoading(true);
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    setLoading(false);
 
-    try {
-      // 1️⃣ AUTH SIGN UP
-      const { data, error: authErr } = await supabase.auth.signUp({
-        email,
-        password
-      });
-
-      if (authErr) throw authErr;
-      if (!data.user) throw new Error("Gagal membuat user");
-
-      const userId = data.user.id;
-
-      // 2️⃣ INSERT PROFILE (USERNAME + EMAIL)
-      const { error: profileErr } = await supabase
-        .from("profiles")
-        .insert({
-          id: userId,
-          username,
-          email
-        });
-
-      if (profileErr) throw profileErr;
-
-      // 3️⃣ CREATE WALLET (BALANCE = 0)
-      const { error: walletErr } = await supabase
-        .from("wallets")
-        .insert({
-          user_id: userId,
-          balance: 0
-        });
-
-      if (walletErr) throw walletErr;
-
-      alert("Pendaftaran berhasil, silakan login");
-      router.push("/login");
-
-    } catch (err) {
-      console.error(err);
-      setError(err.message || "Terjadi kesalahan");
-    } finally {
-      setLoading(false);
+    if (error) {
+      alert(error.message);
+    } else {
+      alert("Pendaftaran berhasil. Silakan login.");
+      window.location.href = "/login";
     }
   };
 
   return (
-    <div style={wrap}>
-      <h1>Daftar Akun</h1>
-
-      <form onSubmit={submit} style={card}>
-        <input
-          style={input}
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
+    <div style={page}>
+      <div style={card}>
+        <h1 style={title}>Buat Akun</h1>
+        <p style={subtitle}>Daftar untuk mulai berinvestasi</p>
 
         <input
           style={input}
-          type="email"
           placeholder="Email"
+          type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
 
         <input
           style={input}
-          type="password"
           placeholder="Password"
+          type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
 
         <input
           style={input}
-          type="password"
           placeholder="Konfirmasi Password"
+          type="password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
         />
 
-        <button style={btn} disabled={loading}>
+        <button style={btn} onClick={register} disabled={loading}>
           {loading ? "Memproses..." : "Daftar"}
         </button>
 
-        {error && <p style={err}>{error}</p>}
-      </form>
+        <p style={footerText}>
+          Sudah punya akun? <a href="/login">Masuk</a>
+        </p>
+      </div>
     </div>
   );
 }
 
-/* ===== STYLES ===== */
-
-const wrap = { maxWidth: 420, margin: "0 auto" };
+/* ===============================
+   STYLES
+================================ */
+const page = {
+  minHeight: "100vh",
+  background: "linear-gradient(135deg, #0B1C2D, #132F4C)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
 
 const card = {
   background: "white",
-  padding: 24,
-  borderRadius: 14,
-  boxShadow: "0 10px 24px rgba(0,0,0,0.08)"
+  padding: 40,
+  borderRadius: 20,
+  width: 380,
+  boxShadow: "0 20px 50px rgba(0,0,0,0.25)",
+};
+
+const title = {
+  fontSize: 28,
+  fontWeight: 800,
+  marginBottom: 6,
+};
+
+const subtitle = {
+  fontSize: 14,
+  opacity: 0.7,
+  marginBottom: 30,
 };
 
 const input = {
   width: "100%",
-  padding: 12,
-  marginBottom: 12,
-  borderRadius: 10,
-  border: "1px solid #ddd"
+  padding: "14px 16px",
+  borderRadius: 12,
+  border: "1px solid #e5e7eb",
+  marginBottom: 14,
+  fontSize: 14,
 };
 
 const btn = {
   width: "100%",
-  padding: 12,
-  background: "#0b1c2d",
-  color: "white",
+  padding: "14px",
+  borderRadius: 14,
   border: "none",
-  borderRadius: 10,
-  cursor: "pointer"
+  background: "#D4AF37",
+  color: "#0B1C2D",
+  fontWeight: 800,
+  cursor: "pointer",
+  marginTop: 10,
 };
 
-const err = { color: "red", marginTop: 10, fontSize: 13 };
+const footerText = {
+  marginTop: 24,
+  fontSize: 13,
+  textAlign: "center",
+};
