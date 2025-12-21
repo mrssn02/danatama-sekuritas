@@ -6,7 +6,7 @@ import { supabase } from "../../lib/supabase";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);register
 
   const login = async () => {
     if (!email || !password) {
@@ -55,7 +55,7 @@ export default function LoginPage() {
         </button>
 
         <p style={footerText}>
-          Belum punya akun? <a href="/register">Daftar sekarang</a>
+          Belum punya akun? <a href="/daftar">Daftar sekarang</a>
         </p>
       </div>
     </div>
