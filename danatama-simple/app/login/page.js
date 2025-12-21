@@ -55,7 +55,7 @@ export default function LoginPage() {
         </button>
 
         <p style={footerText}>
-          Belum punya akun? <a href="/register">Daftar sekarang</a>
+          Belum punya akun? <a href="/daftar">Daftar sekarang</a>
         </p>
       </div>
     </div>
