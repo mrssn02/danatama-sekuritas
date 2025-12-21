@@ -25,14 +25,14 @@ export default function AdminPage() {
   // ===============================
   useEffect(() => {
     const init = async () => {
-      const { data: auth } = await supabase.auth.getUser();
+      const { data } = await supabase.auth.getUser();
 
-      if (!auth?.user) {
+      if (!data?.user) {
         window.location.href = "/login";
         return;
       }
 
-      if (!ADMIN_EMAILS.includes(auth.user.email)) {
+      if (!ADMIN_EMAILS.includes(data.user.email)) {
         alert("Akses admin ditolak");
         window.location.href = "/";
         return;
@@ -78,42 +78,19 @@ export default function AdminPage() {
   };
 
   // ===============================
-  // TRANSACTION ACTIONS
+  // TRANSACTION ACTIONS (AMAN)
   // ===============================
   const approveTx = async (tx) => {
-    if (tx.status !== "pending") {
-      alert("Transaksi sudah diproses");
-      return;
-    }
+    if (processingId) return;
 
     setProcessingId(tx.id);
 
-    // Update status
-    const { error } = await supabase
-      .from("transactions")
-      .update({
-        status: "approved",
-        admin_note: adminNote || "Disetujui admin",
-        approved_at: new Date().toISOString(),
-      })
-      .eq("id", tx.id);
+    const { error } = await supabase.rpc("approve_transaction", {
+      tx_id: tx.id,
+    });
 
     if (error) {
       alert(error.message);
-      setProcessingId(null);
-      return;
-    }
-
-    // Update saldo
-    const amount = tx.type === "deposit" ? tx.amount : -tx.amount;
-
-    const { error: balErr } = await supabase.rpc("adjust_balance", {
-      uid: tx.user_id,
-      amt: amount,
-    });
-
-    if (balErr) {
-      alert(balErr.message);
       setProcessingId(null);
       return;
     }
@@ -130,21 +107,14 @@ export default function AdminPage() {
       return;
     }
 
-    if (tx.status !== "pending") {
-      alert("Transaksi sudah diproses");
-      return;
-    }
+    if (processingId) return;
 
     setProcessingId(tx.id);
 
-    const { error } = await supabase
-      .from("transactions")
-      .update({
-        status: "rejected",
-        admin_note: adminNote,
-        rejected_at: new Date().toISOString(),
-      })
-      .eq("id", tx.id);
+    const { error } = await supabase.rpc("reject_transaction", {
+      tx_id: tx.id,
+      note: adminNote,
+    });
 
     if (error) {
       alert(error.message);
@@ -159,7 +129,7 @@ export default function AdminPage() {
   };
 
   // ===============================
-  // MANUAL BALANCE
+  // MANUAL BALANCE (AMAN)
   // ===============================
   const manualAdjust = async () => {
     if (!manualEmail || !manualAmount) {
