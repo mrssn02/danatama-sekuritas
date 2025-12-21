@@ -75,7 +75,7 @@ export default function WithdrawPage() {
     }
 
     alert("Permintaan withdraw berhasil dikirim");
-    router.push("/dompet");
+    router.push("/wallet");
   };
 
   if (loading) {
