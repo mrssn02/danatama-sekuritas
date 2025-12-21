@@ -13,26 +13,25 @@ export default function AdminPage() {
   const [csWhatsapp, setCsWhatsapp] = useState("");
 
   const [transactions, setTransactions] = useState([]);
-  const [adminNote, setAdminNote] = useState("");
+  const [adminNotes, setAdminNotes] = useState({}); // PER TRANSAKSI
+  const [processingId, setProcessingId] = useState(null);
 
   const [manualEmail, setManualEmail] = useState("");
   const [manualAmount, setManualAmount] = useState("");
 
-  const [processingId, setProcessingId] = useState(null);
-
-  // ===============================
-  // AUTH & INIT
-  // ===============================
+  /* ===============================
+     AUTH & INIT
+  ================================ */
   useEffect(() => {
     const init = async () => {
-      const { data } = await supabase.auth.getUser();
+      const { data: auth } = await supabase.auth.getUser();
 
-      if (!data?.user) {
+      if (!auth?.user) {
         window.location.href = "/login";
         return;
       }
 
-      if (!ADMIN_EMAILS.includes(data.user.email)) {
+      if (!ADMIN_EMAILS.includes(auth.user.email)) {
         alert("Akses admin ditolak");
         window.location.href = "/";
         return;
@@ -47,12 +46,11 @@ export default function AdminPage() {
     init();
   }, []);
 
-  // ===============================
-  // LOAD DATA
-  // ===============================
+  /* ===============================
+     LOAD DATA
+  ================================ */
   const loadSettings = async () => {
     const { data } = await supabase.from("settings").select("*");
-
     data?.forEach((s) => {
       if (s.key === "deposit_bank") setDepositBank(s.value);
       if (s.key === "cs_whatsapp") setCsWhatsapp(s.value);
@@ -69,24 +67,31 @@ export default function AdminPage() {
     setTransactions(data || []);
   };
 
-  // ===============================
-  // SETTINGS
-  // ===============================
+  /* ===============================
+     SETTINGS
+  ================================ */
   const saveSetting = async (key, value) => {
     await supabase.from("settings").upsert({ key, value });
     alert("Tersimpan");
   };
 
-  // ===============================
-  // TRANSACTION ACTIONS (AMAN)
-  // ===============================
+  /* ===============================
+     APPROVE TRANSACTION
+  ================================ */
   const approveTx = async (tx) => {
     if (processingId) return;
+    if (tx.status !== "pending") {
+      alert("Transaksi sudah diproses");
+      return;
+    }
 
     setProcessingId(tx.id);
 
+    const note = adminNotes[tx.id] || "Disetujui admin";
+
     const { error } = await supabase.rpc("approve_transaction", {
       tx_id: tx.id,
+      admin_note: note,
     });
 
     if (error) {
@@ -96,24 +101,27 @@ export default function AdminPage() {
     }
 
     alert("Transaksi di-ACC");
-    setAdminNote("");
     setProcessingId(null);
     loadPending();
   };
 
+  /* ===============================
+     REJECT TRANSACTION
+  ================================ */
   const rejectTx = async (tx) => {
-    if (!adminNote) {
-      alert("Masukkan alasan penolakan");
+    if (processingId) return;
+    const note = adminNotes[tx.id];
+
+    if (!note) {
+      alert("Alasan reject wajib diisi");
       return;
     }
-
-    if (processingId) return;
 
     setProcessingId(tx.id);
 
     const { error } = await supabase.rpc("reject_transaction", {
       tx_id: tx.id,
-      note: adminNote,
+      admin_reason: note,
     });
 
     if (error) {
@@ -123,14 +131,13 @@ export default function AdminPage() {
     }
 
     alert("Transaksi ditolak");
-    setAdminNote("");
     setProcessingId(null);
     loadPending();
   };
 
-  // ===============================
-  // MANUAL BALANCE (AMAN)
-  // ===============================
+  /* ===============================
+     MANUAL BALANCE (TANPA RIWAYAT)
+  ================================ */
   const manualAdjust = async () => {
     if (!manualEmail || !manualAmount) {
       alert("Email dan nominal wajib diisi");
@@ -163,9 +170,9 @@ export default function AdminPage() {
     setManualAmount("");
   };
 
-  // ===============================
-  // RENDER
-  // ===============================
+  /* ===============================
+     RENDER
+  ================================ */
   if (loading) return <p>Memuat...</p>;
   if (!authorized) return null;
 
@@ -176,24 +183,14 @@ export default function AdminPage() {
       {/* SETTINGS */}
       <div style={card}>
         <h3>Rekening Deposit</h3>
-        <input
-          value={depositBank}
-          onChange={(e) => setDepositBank(e.target.value)}
-        />
-        <button onClick={() => saveSetting("deposit_bank", depositBank)}>
-          Simpan
-        </button>
+        <input value={depositBank} onChange={(e) => setDepositBank(e.target.value)} />
+        <button onClick={() => saveSetting("deposit_bank", depositBank)}>Simpan</button>
       </div>
 
       <div style={card}>
         <h3>CS WhatsApp</h3>
-        <input
-          value={csWhatsapp}
-          onChange={(e) => setCsWhatsapp(e.target.value)}
-        />
-        <button onClick={() => saveSetting("cs_whatsapp", csWhatsapp)}>
-          Simpan
-        </button>
+        <input value={csWhatsapp} onChange={(e) => setCsWhatsapp(e.target.value)} />
+        <button onClick={() => saveSetting("cs_whatsapp", csWhatsapp)}>Simpan</button>
       </div>
 
       {/* TRANSACTIONS */}
@@ -205,16 +202,17 @@ export default function AdminPage() {
         {transactions.map((t) => (
           <div key={t.id} style={tx}>
             <p>
-              <b>{t.type.toUpperCase()}</b> — Rp{" "}
-              {t.amount.toLocaleString()}
+              <b>{t.type.toUpperCase()}</b> — Rp {t.amount.toLocaleString()}
             </p>
 
             {t.note && <p>Catatan User: {t.note}</p>}
 
             <textarea
               placeholder="Catatan admin (wajib untuk reject)"
-              value={adminNote}
-              onChange={(e) => setAdminNote(e.target.value)}
+              value={adminNotes[t.id] || ""}
+              onChange={(e) =>
+                setAdminNotes({ ...adminNotes, [t.id]: e.target.value })
+              }
               style={{ width: "100%", marginBottom: 8 }}
             />
 
