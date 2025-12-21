@@ -144,31 +144,29 @@ export default function AdminPage() {
       return;
     }
 
-    const { data: user } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("email", manualEmail)
-      .single();
+    const manualAdjust = async () => {
+      if (!manualEmail || !manualAmount) {
+        alert("Email dan nominal wajib diisi");
+        return;
+      }
 
-    if (!user) {
-      alert("User tidak ditemukan");
-      return;
-    }
+      const { error } = await supabase.rpc(
+        "admin_adjust_balance_by_email",
+        {
+          p_email: manualEmail.trim(),
+          p_amount: Number(manualAmount),
+        }
+      );
 
-    const { error } = await supabase.rpc("adjust_balance", {
-      uid: user.id,
-      amt: Number(manualAmount),
-    });
+      if (error) {
+        alert(error.message);
+        return;
+      }
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    alert("Saldo berhasil diubah");
-    setManualEmail("");
-    setManualAmount("");
-  };
+      alert("Saldo berhasil diubah");
+      setManualEmail("");
+      setManualAmount("");
+    };
 
   /* ===============================
      RENDER
