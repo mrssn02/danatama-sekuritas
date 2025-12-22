@@ -27,6 +27,12 @@ export default function Investasi() {
     const amt = Number(amount[p.id] || 0);
     if (!amt) return alert("Masukkan nominal investasi");
 
+    if (amt < p.min_amount) {
+      return alert(
+        `Minimal investasi Rp ${Number(p.min_amount).toLocaleString("id-ID")}`
+      );
+    }
+
     setLoadingId(p.id);
     try {
       const { error } = await supabase.rpc("invest_buy", {
@@ -50,30 +56,27 @@ export default function Investasi() {
       <div style={headerBox}>
         <h1 style={title}>Produk Investasi</h1>
         <p style={subtitle}>
-          Pilih produk investasi premium dengan imbal hasil harian.
+          Investasi premium dengan sistem aman & transparan.
         </p>
       </div>
 
       <div style={grid}>
         {products.map((p) => (
           <div key={p.id} style={card}>
-            <div style={cardTop}>
-              <span style={badge}>INVESTMENT</span>
-              <h3 style={productName}>{p.name}</h3>
-              <p style={desc}>{p.description}</p>
-            </div>
+            <span style={badge}>INVESTMENT</span>
 
-            <div style={divider} />
+            <h3 style={productName}>{p.name}</h3>
+            <p style={desc}>{p.description}</p>
 
             <div style={infoRow}>
               <div>
-                <div style={label}>Minimal Investasi</div>
+                <div style={label}>Minimal</div>
                 <div style={value}>
                   Rp {Number(p.min_amount).toLocaleString("id-ID")}
                 </div>
               </div>
 
-              <div>
+              <div style={{ textAlign: "right" }}>
                 <div style={label}>ROI Harian</div>
                 <div style={roi}>{p.roi_daily_percent}%</div>
               </div>
@@ -81,7 +84,9 @@ export default function Investasi() {
 
             <input
               style={input}
-              placeholder="Masukkan nominal investasi"
+              type="number"
+              inputMode="numeric"
+              placeholder="Nominal investasi"
               value={amount[p.id] || ""}
               onChange={(e) =>
                 setAmount((prev) => ({
@@ -94,7 +99,7 @@ export default function Investasi() {
             <button
               style={{
                 ...btn,
-                opacity: loadingId === p.id ? 0.7 : 1,
+                opacity: loadingId === p.id ? 0.6 : 1,
               }}
               disabled={loadingId === p.id}
               onClick={() => buy(p)}
@@ -109,21 +114,21 @@ export default function Investasi() {
 }
 
 /* ===============================
-   STYLES — LUXURY
+   STYLES — LUXURY + MOBILE SAFE
 ================================ */
 
 const container = {
-  maxWidth: 1100,
+  maxWidth: 1200,
   margin: "0 auto",
-  paddingBottom: 40,
+  padding: "0 16px 40px",
 };
 
 const headerBox = {
-  marginBottom: 30,
+  marginBottom: 28,
 };
 
 const title = {
-  fontSize: 30,
+  fontSize: 28,
   fontWeight: 800,
   marginBottom: 6,
 };
@@ -131,25 +136,22 @@ const title = {
 const subtitle = {
   color: "#64748b",
   fontSize: 15,
+  lineHeight: 1.5,
 };
 
 const grid = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-  gap: 24,
+  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+  gap: 20,
 };
 
 const card = {
   background: "linear-gradient(180deg, #ffffff, #f8fafc)",
   borderRadius: 20,
-  padding: 22,
-  boxShadow: "0 20px 40px rgba(0,0,0,0.08)",
+  padding: 20,
+  boxShadow: "0 18px 36px rgba(0,0,0,0.08)",
   display: "flex",
   flexDirection: "column",
-};
-
-const cardTop = {
-  marginBottom: 14,
 };
 
 const badge = {
@@ -158,27 +160,22 @@ const badge = {
   fontSize: 11,
   padding: "4px 10px",
   borderRadius: 999,
-  display: "inline-block",
+  width: "fit-content",
   marginBottom: 10,
   letterSpacing: 0.5,
 };
 
 const productName = {
-  fontSize: 20,
+  fontSize: 19,
   fontWeight: 800,
-  margin: "4px 0",
+  marginBottom: 6,
 };
 
 const desc = {
   fontSize: 14,
   color: "#475569",
   lineHeight: 1.6,
-};
-
-const divider = {
-  height: 1,
-  background: "#e5e7eb",
-  margin: "14px 0",
+  marginBottom: 14,
 };
 
 const infoRow = {
@@ -205,22 +202,23 @@ const roi = {
 
 const input = {
   width: "100%",
-  padding: "12px 14px",
-  borderRadius: 12,
+  padding: "14px",
+  borderRadius: 14,
   border: "1px solid #e5e7eb",
-  fontSize: 14,
+  fontSize: 15,
   marginBottom: 14,
   outline: "none",
 };
 
 const btn = {
   width: "100%",
-  padding: "14px",
+  padding: "15px",
   background: "linear-gradient(135deg, #0b1c2d, #1e293b)",
   color: "white",
   border: 0,
-  borderRadius: 14,
+  borderRadius: 16,
   fontSize: 15,
   fontWeight: 700,
   cursor: "pointer",
+  touchAction: "manipulation", // ⬅️ penting agar aman di HP
 };
