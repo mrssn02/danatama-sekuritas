@@ -1,0 +1,29 @@
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+button, a {
+  touch-action: manipulation;
+}
+
+input, textarea, select {
+  font-size: 16px; /* anti zoom iOS */
+}
+
+body {
+  margin: 0;
+  background: #f4f6f8;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+@media (max-width: 640px) {
+  body {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  h1 {
+    font-size: 24px !important;
+  }
+}
