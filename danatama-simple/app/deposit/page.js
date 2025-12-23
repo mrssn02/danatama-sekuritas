@@ -119,7 +119,7 @@ export default function DepositPage() {
           </button>
 
           <div style={footerNote}>
-            Deposit akan diproses setelah diverifikasi oleh admin.
+            Deposit akan diproses setelah diverifikasi oleh otomatis.
           </div>
         </div>
       </div>
