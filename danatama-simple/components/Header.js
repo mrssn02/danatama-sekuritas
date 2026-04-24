@@ -49,7 +49,7 @@ export default function Header() {
           <div style={brand}>
             <img src="/logo.png" alt="Danatama" style={{ height: 42 }} />
             <div>
-              <div style={title}>SHOPEE AFFILIATE</div>
+              <div style={title}>PT. DANATAMA MAKMUR SEKURITAS</div>
               <div style={subtitle}>Member of Indonesia Stock Exchange</div>
             </div>
           </div>
