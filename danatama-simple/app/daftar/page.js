@@ -20,28 +20,33 @@ export default function RegisterPage() {
       return;
     }
 
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
 
-    setLoading(false);
+      if (error) {
+        throw error;
+      }
 
-    if (error) {
-      alert("Error: " + error.message);
-      return;
+      // 🔥 handle email verification
+      if (data?.user && !data.session) {
+        alert("Cek email kamu untuk verifikasi akun!");
+      } else {
+        alert("Pendaftaran berhasil!");
+      }
+
+      // redirect ke login
+      window.location.href = "/login";
+    } catch (err) {
+      console.error("Register error:", err);
+      alert(err.message || "Terjadi kesalahan saat daftar");
+    } finally {
+      setLoading(false);
     }
-
-    // 🔥 cek apakah perlu verifikasi email
-    if (data?.user && !data.session) {
-      alert("Cek email kamu untuk verifikasi akun!");
-    } else {
-      alert("Pendaftaran berhasil!");
-    }
-
-    window.location.href = "/login";
   };
 
   return (
@@ -85,3 +90,61 @@ export default function RegisterPage() {
     </div>
   );
 }
+
+/* ===============================
+   STYLES (TIDAK DIUBAH)
+================================ */
+const page = {
+  minHeight: "100vh",
+  background: "linear-gradient(135deg, #0B1C2D, #132F4C)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const card = {
+  background: "white",
+  padding: 40,
+  borderRadius: 20,
+  width: 380,
+  boxShadow: "0 20px 50px rgba(0,0,0,0.25)",
+};
+
+const title = {
+  fontSize: 28,
+  fontWeight: 800,
+  marginBottom: 6,
+};
+
+const subtitle = {
+  fontSize: 14,
+  opacity: 0.7,
+  marginBottom: 30,
+};
+
+const input = {
+  width: "100%",
+  padding: "14px 16px",
+  borderRadius: 12,
+  border: "1px solid #e5e7eb",
+  marginBottom: 14,
+  fontSize: 14,
+};
+
+const btn = {
+  width: "100%",
+  padding: "14px",
+  borderRadius: 14,
+  border: "none",
+  background: "#D4AF37",
+  color: "#0B1C2D",
+  fontWeight: 800,
+  cursor: "pointer",
+  marginTop: 10,
+};
+
+const footerText = {
+  marginTop: 24,
+  fontSize: 13,
+  textAlign: "center",
+};
