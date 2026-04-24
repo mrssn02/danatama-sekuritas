@@ -32,11 +32,11 @@ export default function Wallet() {
 
       setUsername(p.data?.username || "Member");
 
-      // === WALLET ===
+      // === WALLET (FIX: ambil dari users, bukan wallets) ===
       const w = await supabase
-        .from("wallets")
+        .from("users")
         .select("balance")
-        .eq("user_id", uid)
+        .eq("id", uid)
         .single();
 
       setBalance(Number(w.data?.balance || 0));
