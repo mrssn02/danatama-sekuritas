@@ -25,14 +25,21 @@ export default function WithdrawPage() {
 
       const uid = data.user.id;
 
-      // === FIX: AMBIL SALDO DARI USERS ===
-      const { data: user } = await supabase
-        .from("users")
+      // === FIX: ambil saldo terbaru (hindari .single() karena duplikat row)
+      const { data: wallets, error } = await supabase
+        .from("wallets")
         .select("balance")
-        .eq("id", uid)
-        .single();
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false })
+        .limit(1);
 
-      setBalance(Number(user?.balance || 0));
+      if (error) {
+        console.error(error);
+      }
+
+      const latestBalance = wallets?.[0]?.balance || 0;
+      setBalance(Number(latestBalance));
+
       setLoading(false);
     });
   }, [router]);
