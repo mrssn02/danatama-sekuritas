@@ -25,14 +25,14 @@ export default function WithdrawPage() {
 
       const uid = data.user.id;
 
-      // === GET WALLET BALANCE ===
-      const { data: wallet } = await supabase
-        .from("wallets")
+      // === FIX: AMBIL SALDO DARI USERS ===
+      const { data: user } = await supabase
+        .from("users")
         .select("balance")
-        .eq("user_id", uid)
+        .eq("id", uid)
         .single();
 
-      setBalance(Number(wallet?.balance || 0));
+      setBalance(Number(user?.balance || 0));
       setLoading(false);
     });
   }, [router]);
