@@ -25,20 +25,18 @@ export default function WithdrawPage() {
 
       const uid = data.user.id;
 
-      // === FIX: ambil saldo terbaru (hindari .single() karena duplikat row)
-      const { data: wallets, error } = await supabase
-        .from("wallets")
+      // ✅ FIX: samakan dengan wallet (pakai users table)
+      const { data: userData, error } = await supabase
+        .from("users")
         .select("balance")
-        .eq("user_id", uid)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .eq("id", uid)
+        .single();
 
       if (error) {
         console.error(error);
       }
 
-      const latestBalance = wallets?.[0]?.balance || 0;
-      setBalance(Number(latestBalance));
+      setBalance(Number(userData?.balance || 0));
 
       setLoading(false);
     });
@@ -169,7 +167,7 @@ export default function WithdrawPage() {
 }
 
 /* ===============================
-   LUXURY THEME
+   LUXURY THEME (TIDAK DIUBAH)
 ================================ */
 const DARK = "#0B1C2D";
 const GOLD = "#D4AF37";
@@ -210,7 +208,6 @@ const title = {
   color: DARK,
 };
 
-/* SALDO */
 const saldoBox = {
   background: "#F8FAFC",
   padding: 18,
@@ -231,7 +228,6 @@ const saldoValue = {
   marginTop: 6,
 };
 
-/* FORM */
 const formGroup = {
   marginBottom: 18,
 };
@@ -252,7 +248,6 @@ const input = {
   outline: "none",
 };
 
-/* BUTTON */
 const submitBtn = {
   width: "100%",
   marginTop: 18,
