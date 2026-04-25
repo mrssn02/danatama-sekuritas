@@ -20,67 +20,71 @@ export default function Dashboard() {
 
   useEffect(() => {
     const init = async () => {
-      const { data: auth, error: authError } = await supabase.auth.getUser();
+      try {
+        const { data: auth, error: authError } =
+          await supabase.auth.getUser();
 
-      if (authError || !auth?.user) {
-        window.location.href = "/login";
-        return;
+        if (authError || !auth?.user) {
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
+          }
+          return;
+        }
+
+        const uid = auth.user.id;
+        setUser(auth.user);
+
+        // PROFILE
+        const { data: prof, error: profError } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", uid);
+
+        if (profError) console.error("Profile error:", profError);
+
+        setUsername(prof?.[0]?.username || "");
+
+        // WALLET (FIX UTAMA - TANPA single/maybeSingle)
+        const { data: w, error: wError } = await supabase
+          .from("wallets")
+          .select("balance")
+          .eq("user_id", uid);
+
+        if (wError) console.error("Wallet error:", wError);
+
+        setBalance(Number(w?.[0]?.balance || 0));
+
+        // INVESTMENTS
+        const { data: inv, error: invError } = await supabase
+          .from("user_investments")
+          .select("amount, investment_products(name)")
+          .eq("user_id", uid);
+
+        if (invError) console.error("Investment error:", invError);
+
+        setInvestments(inv || []);
+
+        // TRANSACTIONS
+        const { data: tx, error: txError } = await supabase
+          .from("transactions")
+          .select("status")
+          .eq("user_id", uid);
+
+        if (txError) console.error("Transaction error:", txError);
+
+        const sum = { pending: 0, approved: 0, rejected: 0 };
+        (tx || []).forEach((t) => {
+          if (t.status === "pending") sum.pending++;
+          else if (t.status === "approved") sum.approved++;
+          else if (t.status === "rejected") sum.rejected++;
+        });
+
+        setTxSummary(sum);
+      } catch (err) {
+        console.error("Dashboard fatal error:", err);
+      } finally {
+        setLoading(false);
       }
-
-      setUser(auth.user);
-
-      const uid = auth.user.id;
-
-      // Profile (username)
-      const { data: prof, error: profError } = await supabase
-        .from("profiles")
-        .select("username")
-        .eq("id", uid)
-        .maybeSingle();
-
-      if (profError) console.error("Profile error:", profError);
-
-      setUsername(prof?.username || "");
-
-      // Wallet balance (FIX UTAMA DI SINI)
-      const { data: w, error: wError } = await supabase
-        .from("wallets")
-        .select("balance")
-        .eq("user_id", uid)
-        .maybeSingle();
-
-      if (wError) console.error("Wallet error:", wError);
-
-      setBalance(Number(w?.balance || 0));
-
-      // Investments
-      const { data: inv, error: invError } = await supabase
-        .from("user_investments")
-        .select("amount, investment_products(name)")
-        .eq("user_id", uid);
-
-      if (invError) console.error("Investment error:", invError);
-
-      setInvestments(inv || []);
-
-      // Transactions summary
-      const { data: tx, error: txError } = await supabase
-        .from("transactions")
-        .select("status")
-        .eq("user_id", uid);
-
-      if (txError) console.error("Transaction error:", txError);
-
-      const sum = { pending: 0, approved: 0, rejected: 0 };
-      (tx || []).forEach((t) => {
-        if (t.status === "pending") sum.pending++;
-        else if (t.status === "approved") sum.approved++;
-        else if (t.status === "rejected") sum.rejected++;
-      });
-
-      setTxSummary(sum);
-
-      setLoading(false);
     };
 
     init();
@@ -121,7 +125,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* KPI CARDS */}
+        {/* KPI */}
         <div style={grid3}>
           <div style={kpiCard}>
             <div style={kpiLabel}>Saldo Dompet</div>
@@ -180,7 +184,9 @@ export default function Dashboard() {
               style={btnLogout}
               onClick={async () => {
                 await supabase.auth.signOut();
-                window.location.href = "/";
+                if (typeof window !== "undefined") {
+                  window.location.href = "/";
+                }
               }}
             >
               Logout
@@ -188,4 +194,105 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* SISANYA TIDAK DIUBAH */}
+        {/* PORTFOLIO */}
+        <div style={card}>
+          <div style={cardHead}>
+            <h2 style={cardTitle}>Portofolio Investasi</h2>
+            <a href="/investasi" style={miniBtnGold}>
+              + Tambah Investasi
+            </a>
+          </div>
+
+          {investments.length === 0 ? (
+            <div style={emptyState}>
+              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
+                Belum ada investasi
+              </div>
+              <div style={{ opacity: 0.75, marginBottom: 16 }}>
+                Mulai dari produk investasi yang tersedia untuk membangun
+                portofolio.
+              </div>
+              <a href="/investasi" style={btnPrimary}>Mulai Investasi</a>
+            </div>
+          ) : (
+            <div style={list}>
+              {investments.map((i, idx) => (
+                <div key={idx} style={row}>
+                  <div>
+                    <div style={rowTitle}>
+                      {i?.investment_products?.name || "Produk Investasi"}
+                    </div>
+                    <div style={rowSub}>
+                      Dana terinvestasi pada produk ini
+                    </div>
+                  </div>
+                  <div style={rowAmount}>
+                    Rp {Number(i.amount || 0).toLocaleString("id-ID")}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* QUICK LINKS */}
+        <div style={card}>
+          <div style={cardHead}>
+            <h2 style={cardTitle}>Akses Cepat</h2>
+            <span style={{ fontSize: 12, opacity: 0.75 }}>
+              Fitur utama platform
+            </span>
+          </div>
+
+          <div style={quickGrid}>
+            <a href="/wallet" style={quickCard}>
+              <div style={quickIcon}>💳</div>
+              <div style={quickTitle}>Dompet</div>
+              <div style={quickDesc}>Lihat saldo & rekening deposit</div>
+            </a>
+
+            <a href="/deposit" style={quickCard}>
+              <div style={quickIcon}>➕</div>
+              <div style={quickTitle}>Deposit</div>
+              <div style={quickDesc}>Ajukan deposit dana</div>
+            </a>
+
+            <a href="/withdraw" style={quickCard}>
+              <div style={quickIcon}>➖</div>
+              <div style={quickTitle}>Withdraw</div>
+              <div style={quickDesc}>Ajukan penarikan dana</div>
+            </a>
+
+            <a href="/riwayat" style={quickCard}>
+              <div style={quickIcon}>🧾</div>
+              <div style={quickTitle}>Riwayat</div>
+              <div style={quickDesc}>Status transaksi & catatan admin</div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =============================== */
+const DARK = "#0B1C2D";
+const DARK2 = "#132F4C";
+const GOLD = "#D4AF37";
+const BG = "#F4F6F8";
+const BORDER = "#E5E7EB";
+const SUCCESS = "#16A34A";
+const DANGER = "#DC2626";
+const PENDING = "#F59E0B";
+
+const pill = (bg) => ({
+  display: "inline-block",
+  padding: "4px 10px",
+  borderRadius: 999,
+  background: bg,
+  color: "white",
+  fontSize: 12,
+  fontWeight: 800,
+});
+
+/* styles tetap sama (tidak diubah) */
