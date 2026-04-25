@@ -1,7 +1,5 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -31,42 +29,39 @@ export default function Dashboard() {
 
       setUser(auth.user);
 
-      const uid = auth.user.id;
-
-      // PROFILE
+      // Profile (username)
       const prof = await supabase
         .from("profiles")
         .select("username")
-        .eq("id", uid)
+        .eq("id", auth.user.id)
         .single();
 
       setUsername(prof.data?.username || "");
 
-      // ✅ FIX SALDO (users)
+      // ✅ FIX: ambil dari users (bukan wallets)
       const w = await supabase
         .from("users")
         .select("balance")
-        .eq("id", uid)
+        .eq("id", auth.user.id)
         .single();
 
       setBalance(Number(w.data?.balance || 0));
 
-      // INVESTMENT
+      // Investments
       const inv = await supabase
         .from("user_investments")
         .select("amount, investment_products(name)")
-        .eq("user_id", uid);
+        .eq("user_id", auth.user.id);
 
       setInvestments(inv.data || []);
 
-      // TRANSAKSI
+      // Transactions summary
       const tx = await supabase
         .from("transactions")
         .select("status")
-        .eq("user_id", uid);
+        .eq("user_id", auth.user.id);
 
       const sum = { pending: 0, approved: 0, rejected: 0 };
-
       (tx.data || []).forEach((t) => {
         if (t.status === "pending") sum.pending++;
         else if (t.status === "approved") sum.approved++;
@@ -82,7 +77,7 @@ export default function Dashboard() {
   }, []);
 
   const formattedBalance = useMemo(() => {
-    return Number(balance || 0).toLocaleString("id-ID");
+    return Number(balance || 0).toLocaleString();
   }, [balance]);
 
   if (loading) {
@@ -98,6 +93,7 @@ export default function Dashboard() {
   return (
     <div style={page}>
       <div style={container}>
+        {/* HEADER */}
         <div style={topBar}>
           <div>
             <div style={crumb}>Dashboard</div>
@@ -115,6 +111,7 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* KPI CARDS */}
         <div style={grid3}>
           <div style={kpiCard}>
             <div style={kpiLabel}>Saldo Dompet</div>
@@ -164,6 +161,9 @@ export default function Dashboard() {
                   {user?.id}
                 </span>
               </div>
+              <div style={{ fontSize: 12, opacity: 0.75 }}>
+                Jaga kerahasiaan data akun Anda.
+              </div>
             </div>
 
             <button
@@ -177,55 +177,65 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+
+        {/* PORTFOLIO */}
+        <div style={card}>
+          <div style={cardHead}>
+            <h2 style={cardTitle}>Portofolio Investasi</h2>
+            <a href="/investasi" style={miniBtnGold}>
+              + Tambah Investasi
+            </a>
+          </div>
+
+          {investments.length === 0 ? (
+            <div style={emptyState}>
+              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
+                Belum ada investasi
+              </div>
+              <div style={{ opacity: 0.75, marginBottom: 16 }}>
+                Mulai dari produk investasi yang tersedia untuk membangun
+                portofolio.
+              </div>
+              <a href="/investasi" style={btnPrimary}>Mulai Investasi</a>
+            </div>
+          ) : (
+            <div style={list}>
+              {investments.map((i, idx) => (
+                <div key={idx} style={row}>
+                  <div>
+                    <div style={rowTitle}>
+                      {i?.investment_products?.name || "Produk Investasi"}
+                    </div>
+                    <div style={rowSub}>
+                      Dana terinvestasi pada produk ini
+                    </div>
+                  </div>
+                  <div style={rowAmount}>
+                    Rp {Number(i.amount || 0).toLocaleString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* QUICK LINKS */}
+        <div style={card}>
+          <div style={cardHead}>
+            <h2 style={cardTitle}>Akses Cepat</h2>
+            <span style={{ fontSize: 12, opacity: 0.75 }}>
+              Fitur utama platform
+            </span>
+          </div>
+
+          <div style={quickGrid}>
+            <a href="/wallet" style={quickCard}>💳 Dompet</a>
+            <a href="/deposit" style={quickCard}>➕ Deposit</a>
+            <a href="/withdraw" style={quickCard}>➖ Withdraw</a>
+            <a href="/riwayat" style={quickCard}>🧾 Riwayat</a>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
-
-/* === STYLE (WAJIB ADA, INI YANG BIKIN ERROR KEMARIN) === */
-const DARK = "#0B1C2D";
-const GOLD = "#D4AF37";
-const BG = "#F4F6F8";
-const BORDER = "#E5E7EB";
-const SUCCESS = "#16A34A";
-const DANGER = "#DC2626";
-const PENDING = "#F59E0B";
-
-const page = { background: BG, minHeight: "100vh", padding: "26px 12px" };
-const container = { maxWidth: 1100, margin: "0 auto" };
-const loadingCard = { background: "white", padding: 24 };
-
-const topBar = { display: "flex", justifyContent: "space-between", marginBottom: 20 };
-const crumb = { fontSize: 12 };
-const title = { fontSize: 28, fontWeight: 900 };
-const subtitle = { fontSize: 14 };
-
-const actions = { display: "flex", gap: 10 };
-
-const btnPrimary = { background: GOLD, padding: 10, borderRadius: 10 };
-const btnGhost = { border: `1px solid ${BORDER}`, padding: 10 };
-
-const grid3 = { display: "grid", gap: 16 };
-
-const kpiCard = { background: "white", padding: 16, borderRadius: 12 };
-const kpiLabel = { fontSize: 12 };
-const kpiValue = { fontSize: 24, fontWeight: 900 };
-const kpiHint = { fontSize: 12 };
-
-const kpiButtons = { display: "flex", gap: 10 };
-
-const miniBtnGold = { background: GOLD, padding: 8 };
-const miniBtnDark = { background: DARK, color: "white", padding: 8 };
-
-const miniBtnOutline = { border: `1px solid ${BORDER}`, padding: 8 };
-
-const statusRow = { display: "flex", justifyContent: "space-between" };
-
-const btnLogout = { marginTop: 10, padding: 10 };
-
-const pill = (bg) => ({
-  background: bg,
-  color: "white",
-  padding: "4px 8px",
-  borderRadius: 999,
-});
