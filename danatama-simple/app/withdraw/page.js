@@ -25,7 +25,7 @@ export default function WithdrawPage() {
 
       const uid = data.user.id;
 
-      // ✅ FIX: samakan dengan wallet (pakai users table)
+      // ✅ FIX: samakan dengan wallet (ambil dari users)
       const { data: userData, error } = await supabase
         .from("users")
         .select("balance")
@@ -99,7 +99,6 @@ export default function WithdrawPage() {
         <div style={card}>
           <h1 style={title}>Withdraw Dana</h1>
 
-          {/* SALDO */}
           <div style={saldoBox}>
             <div style={saldoLabel}>Saldo Tersedia</div>
             <div style={saldoValue}>
@@ -107,7 +106,6 @@ export default function WithdrawPage() {
             </div>
           </div>
 
-          {/* FORM */}
           <div style={formGroup}>
             <label style={label}>Nominal Withdraw</label>
             <input
