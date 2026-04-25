@@ -32,40 +32,48 @@ export default function Dashboard() {
       const uid = auth.user.id;
       setUser(auth.user);
 
+      // ===============================
       // PROFILE
-      const { data: prof } = await supabase
+      // ===============================
+      const prof = await supabase
         .from("profiles")
         .select("username")
-        .eq("id", uid);
+        .eq("id", uid)
+        .single();
 
-      setUsername(prof?.[0]?.username || "");
+      setUsername(prof.data?.username || "");
 
-      // 🔥 WALLET FIX (INI YANG PENTING)
-      const { data: wallets } = await supabase
+      // ===============================
+      // 🔥 WALLET (DISAMAKAN DENGAN WALLET PAGE)
+      // ===============================
+      const w = await supabase
         .from("wallets")
-        .select("*")
-        .eq("user_id", uid);
+        .select("balance")
+        .eq("user_id", uid)
+        .single();
 
-      console.log("WALLET DATA:", wallets);
+      setBalance(Number(w.data?.balance || 0));
 
-      setBalance(Number(wallets?.[0]?.balance || 0));
-
+      // ===============================
       // INVESTMENTS
-      const { data: inv } = await supabase
+      // ===============================
+      const inv = await supabase
         .from("user_investments")
         .select("amount, investment_products(name)")
         .eq("user_id", uid);
 
-      setInvestments(inv || []);
+      setInvestments(inv.data || []);
 
+      // ===============================
       // TRANSACTIONS
-      const { data: tx } = await supabase
+      // ===============================
+      const tx = await supabase
         .from("transactions")
         .select("status")
         .eq("user_id", uid);
 
       const sum = { pending: 0, approved: 0, rejected: 0 };
-      (tx || []).forEach((t) => {
+      (tx.data || []).forEach((t) => {
         if (t.status === "pending") sum.pending++;
         else if (t.status === "approved") sum.approved++;
         else if (t.status === "rejected") sum.rejected++;
@@ -228,9 +236,6 @@ export default function Dashboard() {
         <div style={card}>
           <div style={cardHead}>
             <h2 style={cardTitle}>Akses Cepat</h2>
-            <span style={{ fontSize: 12, opacity: 0.75 }}>
-              Fitur utama platform
-            </span>
           </div>
 
           <div style={quickGrid}>
@@ -244,3 +249,205 @@ export default function Dashboard() {
     </div>
   );
 }
+
+/* =============================== */
+/* STYLE (TIDAK DIUBAH) */
+/* =============================== */
+
+const DARK = "#0B1C2D";
+const DARK2 = "#132F4C";
+const GOLD = "#D4AF37";
+const BG = "#F4F6F8";
+const BORDER = "#E5E7EB";
+const SUCCESS = "#16A34A";
+const DANGER = "#DC2626";
+const PENDING = "#F59E0B";
+
+const pill = (bg) => ({
+  display: "inline-block",
+  padding: "4px 10px",
+  borderRadius: 999,
+  background: bg,
+  color: "white",
+  fontSize: 12,
+  fontWeight: 800,
+});
+
+const page = {
+  minHeight: "100vh",
+  background: BG,
+  fontFamily: "Inter, system-ui, sans-serif",
+  padding: "26px 12px",
+};
+
+const container = {
+  maxWidth: 1100,
+  margin: "0 auto",
+};
+
+const loadingCard = {
+  background: "white",
+  border: `1px solid ${BORDER}`,
+  borderRadius: 18,
+  padding: 24,
+};
+
+const topBar = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-end",
+  gap: 20,
+  marginBottom: 22,
+  flexWrap: "wrap",
+};
+
+const crumb = { fontSize: 12, opacity: 0.7, marginBottom: 6 };
+
+const title = {
+  fontSize: 30,
+  fontWeight: 900,
+  margin: 0,
+  color: DARK,
+};
+
+const subtitle = {
+  marginTop: 8,
+  fontSize: 14,
+  opacity: 0.75,
+};
+
+const actions = {
+  display: "flex",
+  gap: 10,
+};
+
+const btnPrimary = {
+  background: GOLD,
+  color: DARK,
+  padding: "12px 18px",
+  borderRadius: 14,
+  fontWeight: 900,
+  textDecoration: "none",
+};
+
+const btnGhost = {
+  border: `1px solid ${BORDER}`,
+  padding: "12px 18px",
+  borderRadius: 14,
+  textDecoration: "none",
+  color: DARK,
+};
+
+const btnLogout = {
+  marginTop: 16,
+  width: "100%",
+  padding: "12px",
+  borderRadius: 14,
+  border: `1px solid ${BORDER}`,
+  background: "white",
+};
+
+const grid3 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: 16,
+};
+
+const kpiCard = {
+  background: "white",
+  borderRadius: 18,
+  padding: 18,
+  border: `1px solid ${BORDER}`,
+};
+
+const kpiLabel = { fontSize: 12, marginBottom: 8 };
+
+const kpiValue = {
+  fontSize: 28,
+  fontWeight: 900,
+};
+
+const kpiHint = { fontSize: 12 };
+
+const kpiButtons = {
+  marginTop: 10,
+  display: "flex",
+  gap: 10,
+};
+
+const miniBtnGold = {
+  background: GOLD,
+  padding: "8px 12px",
+  borderRadius: 10,
+  textDecoration: "none",
+  color: DARK,
+};
+
+const miniBtnDark = {
+  background: DARK,
+  color: "white",
+  padding: "8px 12px",
+  borderRadius: 10,
+  textDecoration: "none",
+};
+
+const miniBtnOutline = {
+  border: `1px solid ${BORDER}`,
+  padding: "8px 12px",
+  borderRadius: 10,
+  textDecoration: "none",
+  color: DARK,
+};
+
+const statusRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  marginBottom: 6,
+};
+
+const card = {
+  background: "white",
+  padding: 18,
+  borderRadius: 18,
+  marginTop: 16,
+};
+
+const cardHead = {
+  display: "flex",
+  justifyContent: "space-between",
+  marginBottom: 12,
+};
+
+const cardTitle = { fontSize: 18, fontWeight: 900 };
+
+const emptyState = {
+  padding: 20,
+  background: DARK,
+  color: "white",
+  borderRadius: 12,
+};
+
+const list = { display: "flex", flexDirection: "column", gap: 10 };
+
+const row = {
+  display: "flex",
+  justifyContent: "space-between",
+};
+
+const rowTitle = { fontWeight: 700 };
+const rowSub = { fontSize: 12 };
+const rowAmount = { fontWeight: 700 };
+
+const quickGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+  gap: 10,
+};
+
+const quickCard = {
+  padding: 12,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 12,
+  textDecoration: "none",
+  color: DARK,
+};
