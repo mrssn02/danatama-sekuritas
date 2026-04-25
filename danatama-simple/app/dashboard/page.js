@@ -23,18 +23,15 @@ export default function Dashboard() {
       const { data: auth } = await supabase.auth.getUser();
 
       if (!auth?.user) {
-        if (typeof window !== "undefined") {
-          window.location.href = "/login";
-        }
+        window.location.href = "/login";
         return;
       }
 
-      const uid = auth.user.id;
       setUser(auth.user);
 
-      // ===============================
-      // PROFILE
-      // ===============================
+      const uid = auth.user.id;
+
+      // === PROFILE ===
       const prof = await supabase
         .from("profiles")
         .select("username")
@@ -43,20 +40,16 @@ export default function Dashboard() {
 
       setUsername(prof.data?.username || "");
 
-      // ===============================
-      // 🔥 WALLET (DISAMAKAN DENGAN WALLET PAGE)
-      // ===============================
+      // === BALANCE (FIX: pakai tabel users, bukan wallets) ===
       const w = await supabase
-        .from("wallets")
+        .from("users")
         .select("balance")
-        .eq("user_id", uid)
+        .eq("id", uid)
         .single();
 
       setBalance(Number(w.data?.balance || 0));
 
-      // ===============================
-      // INVESTMENTS
-      // ===============================
+      // === INVESTMENTS ===
       const inv = await supabase
         .from("user_investments")
         .select("amount, investment_products(name)")
@@ -64,15 +57,14 @@ export default function Dashboard() {
 
       setInvestments(inv.data || []);
 
-      // ===============================
-      // TRANSACTIONS
-      // ===============================
+      // === TRANSACTIONS SUMMARY ===
       const tx = await supabase
         .from("transactions")
         .select("status")
         .eq("user_id", uid);
 
       const sum = { pending: 0, approved: 0, rejected: 0 };
+
       (tx.data || []).forEach((t) => {
         if (t.status === "pending") sum.pending++;
         else if (t.status === "approved") sum.approved++;
@@ -181,9 +173,7 @@ export default function Dashboard() {
               style={btnLogout}
               onClick={async () => {
                 await supabase.auth.signOut();
-                if (typeof window !== "undefined") {
-                  window.location.href = "/";
-                }
+                window.location.href = "/";
               }}
             >
               Logout
@@ -224,7 +214,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div style={rowAmount}>
-                    Rp {Number(i.amount || 0).toLocaleString("id-ID")}
+                    Rp {Number(i.amount || 0).toLocaleString()}
                   </div>
                 </div>
               ))}
@@ -236,218 +226,38 @@ export default function Dashboard() {
         <div style={card}>
           <div style={cardHead}>
             <h2 style={cardTitle}>Akses Cepat</h2>
+            <span style={{ fontSize: 12, opacity: 0.75 }}>
+              Fitur utama platform
+            </span>
           </div>
 
           <div style={quickGrid}>
-            <a href="/wallet" style={quickCard}>Dompet</a>
-            <a href="/deposit" style={quickCard}>Deposit</a>
-            <a href="/withdraw" style={quickCard}>Withdraw</a>
-            <a href="/riwayat" style={quickCard}>Riwayat</a>
+            <a href="/wallet" style={quickCard}>
+              <div style={quickIcon}>💳</div>
+              <div style={quickTitle}>Dompet</div>
+              <div style={quickDesc}>Lihat saldo & rekening deposit</div>
+            </a>
+
+            <a href="/deposit" style={quickCard}>
+              <div style={quickIcon}>➕</div>
+              <div style={quickTitle}>Deposit</div>
+              <div style={quickDesc}>Ajukan deposit dana</div>
+            </a>
+
+            <a href="/withdraw" style={quickCard}>
+              <div style={quickIcon}>➖</div>
+              <div style={quickTitle}>Withdraw</div>
+              <div style={quickDesc}>Ajukan penarikan dana</div>
+            </a>
+
+            <a href="/riwayat" style={quickCard}>
+              <div style={quickIcon}>🧾</div>
+              <div style={quickTitle}>Riwayat</div>
+              <div style={quickDesc}>Status transaksi & catatan admin</div>
+            </a>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
-/* =============================== */
-/* STYLE (TIDAK DIUBAH) */
-/* =============================== */
-
-const DARK = "#0B1C2D";
-const DARK2 = "#132F4C";
-const GOLD = "#D4AF37";
-const BG = "#F4F6F8";
-const BORDER = "#E5E7EB";
-const SUCCESS = "#16A34A";
-const DANGER = "#DC2626";
-const PENDING = "#F59E0B";
-
-const pill = (bg) => ({
-  display: "inline-block",
-  padding: "4px 10px",
-  borderRadius: 999,
-  background: bg,
-  color: "white",
-  fontSize: 12,
-  fontWeight: 800,
-});
-
-const page = {
-  minHeight: "100vh",
-  background: BG,
-  fontFamily: "Inter, system-ui, sans-serif",
-  padding: "26px 12px",
-};
-
-const container = {
-  maxWidth: 1100,
-  margin: "0 auto",
-};
-
-const loadingCard = {
-  background: "white",
-  border: `1px solid ${BORDER}`,
-  borderRadius: 18,
-  padding: 24,
-};
-
-const topBar = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "flex-end",
-  gap: 20,
-  marginBottom: 22,
-  flexWrap: "wrap",
-};
-
-const crumb = { fontSize: 12, opacity: 0.7, marginBottom: 6 };
-
-const title = {
-  fontSize: 30,
-  fontWeight: 900,
-  margin: 0,
-  color: DARK,
-};
-
-const subtitle = {
-  marginTop: 8,
-  fontSize: 14,
-  opacity: 0.75,
-};
-
-const actions = {
-  display: "flex",
-  gap: 10,
-};
-
-const btnPrimary = {
-  background: GOLD,
-  color: DARK,
-  padding: "12px 18px",
-  borderRadius: 14,
-  fontWeight: 900,
-  textDecoration: "none",
-};
-
-const btnGhost = {
-  border: `1px solid ${BORDER}`,
-  padding: "12px 18px",
-  borderRadius: 14,
-  textDecoration: "none",
-  color: DARK,
-};
-
-const btnLogout = {
-  marginTop: 16,
-  width: "100%",
-  padding: "12px",
-  borderRadius: 14,
-  border: `1px solid ${BORDER}`,
-  background: "white",
-};
-
-const grid3 = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-  gap: 16,
-};
-
-const kpiCard = {
-  background: "white",
-  borderRadius: 18,
-  padding: 18,
-  border: `1px solid ${BORDER}`,
-};
-
-const kpiLabel = { fontSize: 12, marginBottom: 8 };
-
-const kpiValue = {
-  fontSize: 28,
-  fontWeight: 900,
-};
-
-const kpiHint = { fontSize: 12 };
-
-const kpiButtons = {
-  marginTop: 10,
-  display: "flex",
-  gap: 10,
-};
-
-const miniBtnGold = {
-  background: GOLD,
-  padding: "8px 12px",
-  borderRadius: 10,
-  textDecoration: "none",
-  color: DARK,
-};
-
-const miniBtnDark = {
-  background: DARK,
-  color: "white",
-  padding: "8px 12px",
-  borderRadius: 10,
-  textDecoration: "none",
-};
-
-const miniBtnOutline = {
-  border: `1px solid ${BORDER}`,
-  padding: "8px 12px",
-  borderRadius: 10,
-  textDecoration: "none",
-  color: DARK,
-};
-
-const statusRow = {
-  display: "flex",
-  justifyContent: "space-between",
-  marginBottom: 6,
-};
-
-const card = {
-  background: "white",
-  padding: 18,
-  borderRadius: 18,
-  marginTop: 16,
-};
-
-const cardHead = {
-  display: "flex",
-  justifyContent: "space-between",
-  marginBottom: 12,
-};
-
-const cardTitle = { fontSize: 18, fontWeight: 900 };
-
-const emptyState = {
-  padding: 20,
-  background: DARK,
-  color: "white",
-  borderRadius: 12,
-};
-
-const list = { display: "flex", flexDirection: "column", gap: 10 };
-
-const row = {
-  display: "flex",
-  justifyContent: "space-between",
-};
-
-const rowTitle = { fontWeight: 700 };
-const rowSub = { fontSize: 12 };
-const rowAmount = { fontWeight: 700 };
-
-const quickGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-  gap: 10,
-};
-
-const quickCard = {
-  padding: 12,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 12,
-  textDecoration: "none",
-  color: DARK,
-};
