@@ -89,7 +89,7 @@ export default function HomePage() {
 
       {/* FOOTER */}
       <footer style={footer}>
-        <div>© 1992–2025 PT. Danatama Makmur Sekuritas</div>
+        <div>© 1992 PT. Danatama Makmur Sekuritas</div>
         <div style={{ fontSize: 13, opacity: 0.7 }}>
           Informasi pada website ini bersifat informatif dan edukatif.
         </div>
