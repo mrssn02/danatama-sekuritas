@@ -9,10 +9,19 @@ export default function HomePage() {
 
   useEffect(() => {
     const init = async () => {
-      const { data } = await supabase.auth.getUser();
+      const { data, error } = await supabase.auth.getUser();
+
+      if (error) {
+        console.error("Auth error:", error);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
       setUser(data?.user || null);
       setLoading(false);
     };
+
     init();
   }, []);
 
