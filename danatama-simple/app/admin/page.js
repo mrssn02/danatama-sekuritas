@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
-const ADMIN_EMAILS = ["sonandra111@gmail.com"];
+const ADMIN_EMAILS = ["raisavalencia5@gmail.com"];
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
