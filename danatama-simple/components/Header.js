@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-const ADMIN_EMAIL = "sonandra111@gmail.com";
+const ADMIN_EMAIL = "raisavalencia5@gmail.com";
 
 export default function Header() {
   const [user, setUser] = useState(null);
